@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Portal de Business Intelligence da CGE — Acompanhamento de solicitações e demandas dos sistemas de TI do Estado de São Paulo.">
+<meta name="author" content="CGE — Controladoria-Geral do Estado">
+<meta property="og:title" content="Portal BI CGE — Relatório de Solicitações de Sistemas">
+<meta property="og:description" content="Painel interativo com indicadores e acompanhamento das demandas dos sistemas CGE.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0f172a">
+<title>Portal BI — CGE | Demandas de Sistemas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f7f4;
+  --bg2:#f0ede8;
+  --surface:#ffffff;
+  --surface2:#f4f2ee;
+  --border:#e2ddd7;
+  --border2:#ccc8c0;
+  --ink:#18170f;
+  --ink2:#5c5a52;
+  --ink3:#9c9a92;
+  --blue:#1847c4;
+  --blue-bg:#eef2fd;
+  --blue-border:#c4d0f8;
+  --green:#146c3a;
+  --green-bg:#e8f6ef;
+  --green-border:#a8dfc0;
+  --amber:#a05c0a;
+  --amber-bg:#fef6e8;
+  --amber-border:#f8d99a;
+  --red:#b01818;
+  --red-bg:#fdf0f0;
+  --red-border:#f0b4b4;
+  --purple:#5b2ca0;
+  --purple-bg:#f3effe;
+  --purple-border:#cbafe8;
+  --teal:#0a6a62;
+  --teal-bg:#e8f7f5;
+  --teal-border:#9addd7;
+  --r:8px;
+  --r2:12px;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 1px 4px rgba(0,0,0,.04);
+  --shadow2:0 2px 8px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.06);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#0f0f0d;--bg2:#17170f;--surface:#1c1c14;--surface2:#232318;
+    --border:#2e2e22;--border2:#3e3e30;
+    --ink:#f5f4ef;--ink2:#a8a69e;--ink3:#666660;
+    --blue:#6b95f5;--blue-bg:#141e3c;--blue-border:#2a3d78;
+    --green:#4dbb7a;--green-bg:#0d2419;--green-border:#1a4d30;
+    --amber:#e8a030;--amber-bg:#261900;--amber-border:#4d3408;
+    --red:#f07070;--red-bg:#260d0d;--red-border:#4d1a1a;
+    --purple:#b08cf0;--purple-bg:#180d30;--purple-border:#362060;
+    --teal:#4accc4;--teal-bg:#061e1c;--teal-border:#123d3a;
+  }
+}
+body{background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.6}
+
+/* ─── TOPBAR ─── */
+.topbar{
+  position:sticky;top:0;z-index:200;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 1.5rem;height:54px;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+}
+.topbar-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.topbar-logo{
+  width:30px;height:30px;border-radius:7px;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.topbar-logo svg{display:block}
+.topbar-name{font-size:13px;font-weight:600;letter-spacing:.2px}
+.topbar-sub{font-size:11px;color:var(--ink3);margin-left:8px;padding-left:8px;border-left:1px solid var(--border2);display:none}
+@media(min-width:640px){.topbar-sub{display:block}}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.topbar-date{font-size:11px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;display:none}
+@media(min-width:768px){.topbar-date{display:block}}
+.btn-upload{
+  padding:6px 14px;border-radius:var(--r);border:1px solid var(--border2);
+  background:var(--surface2);color:var(--ink);font-size:12px;font-weight:500;
+  cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit;
+}
+.btn-upload:hover{background:var(--bg2);border-color:var(--border2)}
+#fileInput{display:none}
+
+/* ─── TABS ─── */
+.tabs-wrap{background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabs-wrap::-webkit-scrollbar{display:none}
+.tabs{display:flex;padding:0 1.5rem;gap:0;white-space:nowrap}
+.tab{
+  padding:11px 16px;font-size:12px;font-weight:500;color:var(--ink2);
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
+  user-select:none;
+}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* ─── MAIN ─── */
+.main{max-width:1320px;margin:0 auto;padding:1.5rem 1.5rem 4rem}
+
+/* ─── SECTION LABEL ─── */
+.slabel{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--ink3);margin-bottom:.6rem}
+
+/* ─── KPI GRID ─── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1.25rem}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1.1rem;box-shadow:var(--shadow)}
+.kpi-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);margin-bottom:4px}
+.kpi-value{font-size:26px;font-weight:600;line-height:1;color:var(--ink);font-family:'IBM Plex Mono',monospace}
+.kpi-sub{font-size:11px;color:var(--ink2);margin-top:3px}
+.kpi.k-blue{border-left:3px solid var(--blue)}
+.kpi.k-green{border-left:3px solid var(--green)}
+.kpi.k-red{border-left:3px solid var(--red)}
+.kpi.k-amber{border-left:3px solid var(--amber)}
+.kpi.k-purple{border-left:3px solid var(--purple)}
+
+/* ─── PROGRESS ─── */
+.prog-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.4rem;box-shadow:var(--shadow);margin-bottom:1.25rem}
+.prog-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.6rem}
+.prog-title{font-size:13px;font-weight:600}
+.prog-pct{font-size:22px;font-weight:600;color:var(--green);font-family:'IBM Plex Mono',monospace}
+.prog-track{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-bottom:.5rem}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--green),#22c55e);border-radius:99px;transition:width .8s cubic-bezier(.16,1,.3,1)}
+.prog-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--ink2)}
+.prog-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+
+/* ─── STATUS CHIPS ─── */
+.status-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem}
+.s-chip{
+  background:var(--surface);border:1px solid var(--border);border-radius:99px;
+  padding:5px 14px;font-size:12px;display:flex;align-items:center;gap:8px;
+  box-shadow:var(--shadow);
+}
+.s-chip-n{font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--ink)}
+.s-chip-l{color:var(--ink2)}
+
+/* ─── CHARTS GRID ─── */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;margin-bottom:1.25rem}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.4rem;box-shadow:var(--shadow)}
+.chart-title{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:1rem}
+.chart-wrap{position:relative;width:100%}
+
+/* ─── TIMELINE CARD ─── */
+.timeline-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.4rem;box-shadow:var(--shadow);margin-bottom:1.25rem}
+
+/* ─── IMPEDIMENTO BLOCK ─── */
+.imp-block{background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--r2);padding:1rem 1.25rem;margin-bottom:1.25rem}
+.imp-title{font-size:12px;font-weight:600;color:var(--red);margin-bottom:.5rem;display:flex;align-items:center;gap:6px}
+.imp-item{font-size:11.5px;color:var(--red);padding:4px 0 4px .75rem;border-left:2px solid var(--red-border);margin-top:4px;line-height:1.4}
+
+/* ─── TABLE CARD ─── */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);box-shadow:var(--shadow);overflow:hidden}
+.table-head{padding:.9rem 1.25rem;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;justify-content:space-between}
+.table-head-title{font-size:12px;font-weight:600}
+.table-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search-box{
+  padding:6px 12px;border:1px solid var(--border);border-radius:var(--r);
+  font-size:12px;background:var(--surface2);color:var(--ink);width:200px;
+  font-family:inherit;transition:border-color .15s;
+}
+.search-box:focus{outline:none;border-color:var(--blue)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{
+  background:var(--surface2);padding:8px 12px;text-align:left;
+  font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--ink2);border-bottom:1px solid var(--border);white-space:nowrap;
+  position:sticky;top:0;
+}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.4}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+td.mono{font-family:'IBM Plex Mono',monospace;font-size:11px}
+
+/* ─── BADGES ─── */
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;white-space:nowrap}
+.b-prod{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.b-open{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)}
+.b-back{background:var(--surface2);color:var(--ink2);border:1px solid var(--border)}
+.b-imp{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.b-hom{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border)}
+.b-enc{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-border)}
+.b-dev{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border)}
+
+/* ─── FALA NOTICE ─── */
+.fala-notice{background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--r);padding:.75rem 1rem;font-size:12px;color:var(--blue);margin-bottom:1rem}
+
+/* ─── FOOTER ─── */
+.footer{text-align:center;padding:2rem;font-size:11px;color:var(--ink3);border-top:1px solid var(--border);margin-top:2rem}
+
+/* ─── TOAST ─── */
+#toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;
+  padding:10px 18px;border-radius:var(--r);font-size:12px;font-weight:500;
+  color:#fff;opacity:0;transition:opacity .3s;pointer-events:none;
+}
+#toast.show{opacity:1}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:640px){
+  .main{padding:1rem 1rem 3rem}
+  .topbar{padding:0 1rem}
+  .tabs{padding:0 1rem}
+  .kpi-value{font-size:22px}
+}
+
+/* ─── PRINT ─── */
+@media print{
+  .topbar,.tabs-wrap,.btn-upload,.table-controls{display:none}
+  .main{padding:0}
+  .chart-card,.timeline-card,.table-card{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="topbar-brand" href="#">
+    <div class="topbar-logo">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="1" width="6" height="6" rx="1.5" fill="#fff" opacity=".9"/>
+        <rect x="9" y="1" width="6" height="6" rx="1.5" fill="#fff" opacity=".6"/>
+        <rect x="1" y="9" width="6" height="6" rx="1.5" fill="#fff" opacity=".6"/>
+        <rect x="9" y="9" width="6" height="6" rx="1.5" fill="#fff" opacity=".4"/>
+      </svg>
+    </div>
+    <span class="topbar-name">Portal BI CGE</span>
+    <span class="topbar-sub">Relatório de Solicitações de Sistemas</span>
+  </a>
+  <div class="topbar-right">
+    <span class="topbar-date" id="topDate"></span>
+    <button class="btn-upload" onclick="document.getElementById('fileInput').click()">↑ Atualizar planilha</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadFile(event)">
+  </div>
+</div>
+
+<div class="tabs-wrap"><div class="tabs" id="tabs"></div></div>
+
+<div class="main" id="main"></div>
+
+<footer class="footer">
+  Portal BI CGE — Dados extraídos da planilha de acompanhamento de demandas · Gerado automaticamente
+</footer>
+
+<div id="toast"></div>
+
+<script>
+// ─── DATA ───
+const RAW = {"FALA-SP":[{"Titulo ":"Verificação dos perfis do FALASP","Card":8,"Status":"Open"},{"Titulo ":"Apurador de denuncia ( Alinhado em 24/10/2025)","Card":9,"Status":"Open"},{"Titulo ":"Analista de primeira instância","Card":10,"Status":"Open"},{"Titulo ":"Autoridade de primeira instância","Card":11,"Status":"Open"},{"Titulo ":"gestor de ouvidoria setorial","Card":12,"Status":"Open"},{"Titulo ":"gestor SIC","Card":13,"Status":"Open"},{"Titulo ":"Administrador","Card":14,"Status":"Open"},{"Titulo ":"Monitoramento","Card":15,"Status":"Open"},{"Titulo ":"Monitoramento CGE - Chamado 231","Card":16,"Status":"Open"},{"Titulo ":"Cadastrador CGE","Card":17,"Status":"Open"},{"Titulo ":"Tratamento de denuncias","Card":18,"Status":"Open"},{"Titulo ":"Tratamento Outras Manifestações Ouvidoria","Card":19,"Status":"Open"},{"Titulo ":"Transcritor de Ouvidoria","Card":20,"Status":"Open"},{"Titulo ":"Analista de segunda instância","Card":21,"Status":"Open"},{"Titulo ":"Autoridade de segunda instância","Card":22,"Status":"Open"},{"Titulo ":"Analista de terceira instância","Card":23,"Status":"Open"},{"Titulo ":"Autoridade de terceira instância","Card":24,"Status":"Open"},{"Titulo ":"Monitoramento CGE - Denúncia","Card":25,"Status":"Open"},{"Titulo ":"Monitoramento CGE - SIC","Card":26,"Status":"Open"},{"Titulo ":"Monitoramento CGE - Ouvidoria","Card":27,"Status":"Open"},{"Titulo ":"Autoridade de Reavaliação CEAI","Card":28,"Status":"Open"},{"Titulo ":"Autoridade Ultrassecreto","Card":29,"Status":"Open"},{"Titulo ":"Autoridade Secreto","Card":30,"Status":"Open"},{"Titulo ":"Autoridade Reservado","Card":31,"Status":"Open"},{"Titulo ":"Analista de Classificação","Card":32,"Status":"Open"},{"Titulo ":"[Comportamento Adicional] Tela de Manifestações - Adição de colunas, filtros e comportamento de tela","Card":65,"Status":"Open"},{"Titulo ":"[Comportamento Adicional] Filtros da tela de manifestações","Card":66,"Status":"Open"},{"Titulo ":"[Relatórios Administrativos] Resolutividade - Distribuição por Órgão","Card":67,"Status":"Open"},{"Titulo ":"Listagem de Encaminhamentos Internos Realizados","Card":71,"Status":"Open"},{"Titulo ":"[Comportamento Adicional] Encerramento automático de manifestações - Pedidos de Acesso à Informação","Card":73,"Status":"Open"},{"Titulo ":"[Visão Analista] Histórico da manifestação - Quebra por acessos e Ações","Card":76,"Status":"Open"},{"Titulo ":"3846 - Encerramento Automático de Pedidos de Acesso à Informação","Card":78,"Status":"Open"},{"Titulo ":"Inclusão dos registros de e-tci e permissão de acesso por perfil para os registros","Card":83,"Status":"Open"},{"Titulo ":"Sistema não retorna todos os órgão na \"Pesquisa por órgão\" para o perfil analista e autoridade de segunda instância","Card":88,"Status":"Open"},{"Titulo ":"[Suporte Fala-SP] - Painel Público - Ajustes","Card":112,"Status":"Open"},{"Titulo ":"1- Para ajustar o título que seria o nome da pagina","Card":113,"Status":"Open"},{"Titulo ":"2- Para ajustar dados do painel","Card":114,"Status":"Open"},{"Titulo ":"Suporte Fala SP - link \"Diligência/Averiguação\" - Retorna acesso negado","Card":116,"Status":"Open"},{"Titulo ":"Suporte Fala SP - 1º instância vendo manifestações não publicadas pelas 2º e 3º instância","Card":123,"Status":"Open"},{"Titulo ":"Perfil Monitoramento  - Ajustes","Card":130,"Status":"Open"},{"Titulo ":"Resolutividade - Ajuste na mensagem de e-mail","Card":133,"Status":"Open"},{"Titulo ":"Documento Dias - Manifestações - Situação Prorrogada","Card":152,"Status":"Open"},{"Titulo ":"Documento Dias - Monitoramento de Cumprimento de Recursos da LAI","Card":163,"Status":"Open"},{"Titulo ":"Erro ao acessar a URL Gestão.Fala (nova url)","Card":168,"Status":"Open"},{"Titulo ":"Suporte Fala SP 11/03 -  Encaminhamento para Subunidades públicas, de manifestações diferentes de Pedido de acesso","Card":173,"Status":"Open"},{"Titulo ":"Reunião 11/03 - Prazo para fechamento das manifestações dos órgãos","Card":177,"Status":"Open"},{"Titulo ":"Reunião 11/03 - resolutividade de outro órgão, a manifestação vai na integra.","Card":179,"Status":"Open"},{"Titulo ":"E-mail 24/02 - Protocolo Homologação 2025012111363172 o prazo para devolutiva não está aparecendo.","Card":181,"Status":"Open"},{"Titulo ":"E-mail 24/02 - Metrô, está com dois protocolos ao abrir o link do encaminhamento para colocar o subsídio a parte de descrição não está abrindo na integra","Card":183,"Status":"Open"},{"Titulo ":"Documento Dias -  Atribuição de protocolo de manifestação ou pedido de acesso à informação para agente que será responsável pelo tratamento.","Card":185,"Status":"Open"},{"Titulo ":"Documento Dias - Campo Síntese da informação IA","Card":186,"Status":"Open"},{"Titulo ":"Documento Dias -  Banco de dados de e-mails de servidores e empregados públicos do Estado","Card":188,"Status":"Open"},{"Titulo ":"Documento dias - PSEUDONIMIZAÇÃO DE DENÚNCIAS:","Card":189,"Status":"Open"},{"Titulo ":"Documento dias - INFORMAÇÕES CLASSIFICADAS EM GRAU DE SIGILO","Card":190,"Status":"Open"},{"Titulo ":"Documento Dias - Incluir filtro por perfil de analista","Card":191,"Status":"Open"},{"Titulo ":"Listagem de pendências AGO - E-mail errado para encaminhamento","Card":193,"Status":"Open"},{"Titulo ":"Listagem de pendências AGO - Outro ponto é que a manifestação está indo com os anexos originais sem possibilidade de exclusão, o que leva em vários casos à identificação do manifestante","Card":194,"Status":"Open"},{"Titulo ":"Listagem de pendências AGO - O Link do homologação está direcionando para o produção.","Card":197,"Status":"Open"},{"Titulo ":"Listagem de pendências SET - Perfil de analista e autoridade 3º instância na Subunidade CEAI está com visualização das TAGS da CGE.","Card":198,"Status":"Open"},{"Titulo ":"Listagem de pendências OUT - Problema de perfil de apuração de perfil SIC","Card":202,"Status":"Open"},{"Titulo ":"Listagem de pendências OUT - duplicidade de nomes no cadastro de usuários","Card":205,"Status":"Open"},{"Titulo ":"Listagem de pendências OUT - servidor da CGE não consegue visualizar todas as etapas da manifestação em 3ª instância","Card":206,"Status":"Open"},{"Titulo ":"Listagem de pendências NOV - não apresenta no histórico a data e a identificação do responsável pela alteração de órgão","Card":214,"Status":"Open"},{"Titulo ":"Listagem de pendências DEZ - problema no filtro da tela de manifestação","Card":215,"Status":"Open"},{"Titulo ":"Listagem de pendências DEZ -prazo protocolo 2024121119570686","Card":217,"Status":"Open"},{"Titulo ":"[Comportamento Adicional] Tela de Manifestações - Adição da coluna \"Notificação Recebida\"","Card":225,"Status":"Open"},{"Titulo ":"Usuário cadastrado na plataforma com perfil de apuração está tendo a possibilidade de clicar no botão para visualizar os dados do manifestante, incluir anexo e incluir tema.","Card":226,"Status":"Open"},{"Titulo ":"Gestor sic deve ter acesso para visualizar e enviar a devolutiva do recurso de segunda e terceira instância para o manifestante.","Card":241,"Status":"Open"},{"Titulo ":"Suporte 28/03 Painel interno PRODUÇÃO - apresenta problemas, para listar manifestações dos órgãos","Card":248,"Status":"Open"},{"Titulo ":"Suporte Fala SP 28/03 - Ambiente de homologação - exportação de dados do painel, trazem dados de outro órgão.","Card":249,"Status":"Open"},{"Titulo ":"Teste interno - pseudonimização no mozilla não funciona.","Card":253,"Status":"Open"},{"Titulo ":"Reunião 04-04 -Facilitar o acesso ao painel interno.","Card":259,"Status":"Open"},{"Titulo ":"Suporte Fala SP 04-04 - Manifestação 2025011313192132 concluída e no histórico não aparece a informação. Prorrogada após conclusão","Card":261,"Status":"Open"},{"Titulo ":"Fala SP- na parte do manifestante não aparece DATA DE CONCLUSÃO para manifestações do tipo Pedido de Acesso a Informação.","Card":268,"Status":"Open"},{"Titulo ":"Extração dos dados dos protocolos no painel externo (observatório)","Card":273,"Status":"Open"},{"Titulo ":"permissões de acesso ao painel interno por perfis.","Card":274,"Status":"Open"},{"Titulo ":"Suporte Fala SP 10/04 - Órgãos que a parte de ouvidoria não está habilitado é possível trocar o tipo de manifestação para manifestações de ouvidoria","Card":275,"Status":"Open"},{"Titulo ":"Inclusão das datas das ações de solicitações e decisões dos recursos SIC LAI","Card":277,"Status":"Open"},{"Titulo ":"[Chamado 397] MUITO IMPORTANTE  - Campos EMENTA e DECISÃO em branco no banco de dados.","Card":280,"Status":"Open"},{"Titulo ":"sistema esta permitindo que o analista e autoridade de primeira instância possa baixar os anexos do protocolos que estão em segunda e terceira instância","Card":285,"Status":"Open"},{"Titulo ":"Verificação Interna - Checklist triplicando informação","Card":289,"Status":"Open"},{"Titulo ":"Encerramento automático dos pedidos de acesso á informação no ambiente de homologação e produção.","Card":290,"Status":"Open"},{"Titulo ":"Origem card 203 - tarefa 1 Manifestação 2024062022530271 - PROBLEMA: A manifestação precisa ser assinada e publicada, mas os dois botões estão desabilitados para a ação.","Card":295,"Status":"Open"},{"Titulo ":"Sistema permite que o perfil apurador de denuncia possa incluir TAG, Tema, Arquivo e mudar o tipo de manifestação.","Card":297,"Status":"Open"},{"Titulo ":"Suporte Fala SP 28/04 - O órgão está me questionando e pelo que verifiquei não está ajustado, mas queria confirmar se arrumaram e deu problema ou se nem subiu o ajuste","Card":301,"Status":"Open"},{"Titulo ":"Documento dias -  Alteração de Situação Concluída -Nº instância para Decisão – Nª instância","Card":306,"Status":"Open"},{"Titulo ":"Reunião 24/02 (card de origem 153)- Contagem de prazos histórico","Card":309,"Status":"Open"},{"Titulo ":"Doc itens para desenvolver - justificativa para prorrogar manifestação","Card":311,"Status":"Open"},{"Titulo ":"[Chamado 312] Reunião 19/02 - Observatório informações para consulta e download do manifestante","Card":312,"Status":"Open"},{"Titulo ":"Justificativa para a não autorização de compartilhamento de dados do denunciante.","Card":314,"Status":"Open"},{"Titulo ":"Plataforma FALASP deve suspender o prazo de 5 dias para encaminhar para outro órgão caso tenha solicitação de compartilhamento de dados pessoais.","Card":320,"Status":"Open"},{"Titulo ":"Sistema permite que o apurador de denuncias permite \"mudar o tipo de manifestação\" e inserir dados no \"Checklist\".\"","Card":325,"Status":"Open"},{"Titulo ":"Elaboração de documento completo/guia do Fala SP","Card":330,"Status":"Open"},{"Titulo ":"[Chamado 42] Visualização de Manifestações - Regra a ser aplicada para o perfil de apurador de denuncia","Card":331,"Status":"Open"},{"Titulo ":"[Chamado 47] Computação da média de resposta em dias no observatório do FALASP","Card":332,"Status":"Open"},{"Titulo ":"Agrupamento de cards Apurador de denuncias","Card":337,"Status":"Open"},{"Titulo ":"Agrupamento de cards Resolutividade","Card":338,"Status":"Open"},{"Titulo ":"Agrupamento de cards Recurso SIC","Card":339,"Status":"Open"},{"Titulo ":"Agrupamento de cards de subunidade - Protótipo Aprovado","Card":342,"Status":"Open"},{"Titulo ":"Agrupamento de cards dos prazos da plataforma","Card":346,"Status":"Open"},{"Titulo ":"[Prazos] Quando o vencimento do prazo para o manifestante abrir recurso cai em um dia não útil, o sistema não altera para o próximo dia útil.","Card":348,"Status":"Open"},{"Titulo ":"[Chamado 89] Manifestações de ouvidoria sendo cadastradas para órgãos que não tem ouvidoria","Card":349,"Status":"Open"},{"Titulo ":"[Chamado 44 - 28/05] Reclamação Técnica – Plataforma FALA.SP.GOV.BR Não Exibe Meus Pedidos/Manifestações","Card":350,"Status":"Open"},{"Titulo ":"[Chamado 58] -O protocolo 2025052713115486 entrou pelo Metrô e eles direcionaram para Artesp","Card":354,"Status":"Open"},{"Titulo ":"[Chamado 62] - Perfis apuração e tratamento de resolutividade estão conflitando, quando associados aparece apenas as denúncias.","Card":357,"Status":"Open"},{"Titulo ":"[Melhorias PAINEIS FALASP] Sugestões de melhorias a serem aplicadas aos paineis","Card":358,"Status":"Open"},{"Titulo ":"[Chamado 53] - O órgão seleciona a subunidade e ao filtrar na parte de manifestações a subunidade não está constando, apenas aparece a subunidade Ouvidoria","Card":359,"Status":"Open"},{"Titulo ":"[Chamado 60] - Estamos com dúvida em algumas manifestação na aba transcrito está Sim para manifestações que o tipo de solicitação foi identificada e anônima.","Card":361,"Status":"Open"},{"Titulo ":"[Chamado 64] - A Artesp reclamou que ao fazer os encaminhamentos internos não está recebendo os e-mails","Card":364,"Status":"Open"},{"Titulo ":"[Chamado 99] - Os protocolos números 2025032812204211 e 2025051514212089 foram encaminhados para Resolutividade a área responsável GER JURIDICA DO IMOBILIARIO, porém a GER DE VIGILANCIA DO IMOBILIARIO está conseguindo acessa-los.","Card":366,"Status":"Open"},{"Titulo ":"[Chamado 91] SANDRA MARIA DA SILVA não está conseguindo ver os pedidos de acesso com situação de encerrada.","Card":367,"Status":"Open"},{"Titulo ":"[Chamado 113] - Sistema adiciona 30 dias a mais na \"data limite para resposta\" quando é respondido um complemento pelo manifestante.","Card":375,"Status":"Open"},{"Titulo ":"[API SEDUC] Testes dos end points de checklist de denuncia, encaminhamento para outro órgão e pseudonimização de denuncias.","Card":378,"Status":"Open"},{"Titulo ":"[API SEDUC] Testes de solicitação de complemento ao manifestante.","Card":388,"Status":"Open"},{"Titulo ":"[Chamado 120] - metadados em documentos Word","Card":389,"Status":"Open"},{"Titulo ":"[Chamado 122] - Subunidades DER - Departamento de estradas e rodagem - Renomear unidades (14), Criar (4) e excluir (3)","Card":390,"Status":"Open"},{"Titulo ":"[API SEDUC] Teste do end point de Alteração do tipo de manifestação","Card":393,"Status":"Open"},{"Titulo ":"[API SEDUC] Criação do end point para envio da resolutividade via API. (FLUXO 1)","Card":395,"Status":"Open"},{"Titulo ":"[API SEDUC] Alteração do idSituação dos protocolos que foram encerrados indevidamente.","Card":397,"Status":"Open"},{"Titulo ":"[Chamado 130] Manifestante não recebe a solicitação de compartilhamento de dados no portal FALASP,","Card":398,"Status":"Open"},{"Titulo ":"[API SEDUC] end point de conclusão, solicitação de complemento, envio de resolutividade, encaminhamento para outro órgão devem notificar o manifestante via email.","Card":405,"Status":"Open"},{"Titulo ":"[Chamado 141] Subsecretaria Gestão de Pessoal (subunidade de abrangência SIC está com protocolos de ouvidoria.","Card":406,"Status":"Open"},{"Titulo ":"Sistema não grava todos registros de alteração de órgão no histórico da manifestação.","Card":407,"Status":"Open"},{"Titulo ":"[encaminhamento para outro órgão] permissão de encaminhamento por subunidade.","Card":408,"Status":"Open"},{"Titulo ":"[Mudar tipo de manifestação] Inclusão de bloqueio por subunidade.","Card":409,"Status":"Open"},{"Titulo ":"[Perfis FALASP] listagem está retornando manifestações indevidamente.","Card":411,"Status":"Open"},{"Titulo ":"[Perfis FALASP] Sistema não permite usuários que possuam perfis direto do órgão e tratamento de resolutividade de uma subunidade responder a solicitação de atuação na resolutividade.","Card":412,"Status":"Open"},{"Titulo ":"[Chamado 144] - Protocolo 2025062611204035, manifestação não foi prorrogada e está contando 60 dias para a resposta.","Card":414,"Status":"Open"},{"Titulo ":"[API Resolutividade fluxo 2] criação da solicitação de atuação da subunidade.","Card":416,"Status":"Open"},{"Titulo ":"[Chamado 146] Prezados protocolos abaixo contando mais de 30 dias, sendo que a ouvidoria não prorrogou - 2025071610155126","Card":417,"Status":"Open"},{"Titulo ":"Origem 375 - Impacto após correção - verificar data de vencimento no painel (extração)  e tratar se ficará prorrogado ou não.","Card":420,"Status":"Open"},{"Titulo ":"[Chamado 149] - Homologação os perfis de Gestor de ouvidoria, Gestor SIC, Tratamento SIC, tratamento de outras manifestações e tratamento de Denúncia conseguem lançar manifestação sem ter perfil de transcritor.","Card":421,"Status":"Open"},{"Titulo ":"[API SEDUC] Endpoint de conclusão da manifestação deve possuir os campos \"Temas\" e \"TAGS\" para ser adicionado na manifestação.","Card":423,"Status":"Open"},{"Titulo ":"[Chamado 154] - Detran, solicita decisão de resolutividade do período de 01/07/2025 até 31/07/2025.","Card":425,"Status":"Open"},{"Titulo ":"Encaminhamento para tratamento","Card":428,"Status":"Open"},{"Titulo ":"[Chamado 372] Solicitação - Lista de Ouvidorias e SIC -  REQUISITO APROVADO (PRAZO MAI/26)","Card":429,"Status":"Open"},{"Titulo ":"[Chamado 157] - Protocolo nº 2025070715071824 - não abre a resposta da shirley.prata@viaapia.com.br","Card":430,"Status":"Open"},{"Titulo ":"[Chamado 162] - Protocolos em órgãos sem ouvidoria ativa","Card":431,"Status":"Open"},{"Titulo ":"[Perfis FALASP] Permissão de resposta da resolutividade para perfis do órgão.","Card":432,"Status":"Open"},{"Titulo ":"[Chamado 168] - Manifestações de denúncia estão aparecendo com Perfil de resolutividade, mesmo a que não estão em resolutividade","Card":435,"Status":"Open"},{"Titulo ":"[API SEDUC] Teste da solicitação de tratamento interno.","Card":440,"Status":"Open"},{"Titulo ":"[API SEDUC] Teste da resposta do encaminhamento para tratamento.","Card":441,"Status":"Open"},{"Titulo ":"Manifestação 202406032394628 com problemas para abrir e ver recursos (origem card 434)","Card":442,"Status":"Open"},{"Titulo ":"[Chamado 177] - Detran, solicita decisão de resolutividade do período de 01/08/2025 à 15/08/2025.","Card":443,"Status":"Open"},{"Titulo ":"[API SEDUC] Não é possivel a pseudonimização para protocolos do tipo \"Sem cadastro\".\"","Card":450,"Status":"Open"},{"Titulo ":"Fala SP x Portal de Serviços (integração)","Card":455,"Status":"Open"},{"Titulo ":"[API SEDUC] consulta pela resposta do encaminhamento para tratamento.","Card":467,"Status":"Open"},{"Titulo ":"[API SEDUC] Criação do serviço de desfazer uma prorrogação.","Card":471,"Status":"Open"},{"Titulo ":"[API SEDUC] Envio de notificação via Email para o manifestante na conclusão da manifestação.","Card":473,"Status":"Open"},{"Titulo ":"[Chamado 196] Encerramento dos pedidos de acesso á informação da terceira instância dos pedidos de acesso á informação (botão de encerramento manual).","Card":474,"Status":"Open"},{"Titulo ":"[Chamado 211] - Subunidades Públicas que são reprovadas pela CGE ficam listadas no campo de filtro de Subunidades","Card":477,"Status":"Open"},{"Titulo ":"[Chamado 212] - Problema nos filtros - órgão + tag","Card":481,"Status":"Open"},{"Titulo ":"[Chamado 219] - manifestação 2025082814045146 chegou ao órgão após 5 dias.","Card":485,"Status":"Open"},{"Titulo ":"Levantamento de requisito - Extração de dados  painel e observatório","Card":487,"Status":"Open"},{"Titulo ":"[Chamado 232] SGGD solicita ajustes nas Subunidades.","Card":492,"Status":"Open"},{"Titulo ":"[Chamado 234] - Manifestação 2024120122321378  identificado no histórico o preenchimento do checklist, mas ao acessar está sem informação","Card":493,"Status":"Open"},{"Titulo ":"[Chamado 240] -  Teste de verificação para acessar os dados pseudonimizados","Card":496,"Status":"Open"},{"Titulo ":"[Chamado 255] - Estamos com inconsistência na quantidade de manifestações concluídas em 2° instância no período de 1/1/2025 até 30/09/2025","Card":504,"Status":"Open"},{"Titulo ":"[Chamado 254] - Protocolo duplicado no painel interno extração dia 10/10/2025","Card":505,"Status":"Open"},{"Titulo ":"[chamado 253] Protocolos de pedido de acesso com problema:","Card":506,"Status":"Open"},{"Titulo ":"Melhorias no PAINEL INTERNO - SPRINT 2","Card":509,"Status":"Open"},{"Titulo ":"Novas colunas na planilha","Card":510,"Status":"Open"},{"Titulo ":"Novo Filtro - Data da Resolutividade","Card":511,"Status":"Open"},{"Titulo ":"Consulta feita por alguns gráficos","Card":512,"Status":"Open"},{"Titulo ":"Ajustes em DEV","Card":518,"Status":"Open"},{"Titulo ":"[Chamado 264] - Possibilitar a alteração do Serviço pela Ouvidoria e SICS após o registro de manifestação.","Card":519,"Status":"Open"},{"Titulo ":"[API SEDUC] Busca de subunidades para encaminhamento para tratamento.","Card":520,"Status":"Open"},{"Titulo ":"[Chamado 275] - Protocolo com resolutividade porém aparece como Concluída, 2025102315522050 sendo que deveria aparecer encerrada","Card":530,"Status":"Open"},{"Titulo ":"[Chamado 273] - Melhorias Observatório","Card":532,"Status":"Open"},{"Titulo ":"Criação de um novo órgão na plataforma FalaSP IMPORTANTE","Card":533,"Status":"Open"},{"Titulo ":"[Chamado 266] Plataforma FalaSP não adiciona 30 dias a mais de prazo para protocolos que entram em diligência na segunda instância dos pedidos de acesso á informação.","Card":535,"Status":"Open"},{"Titulo ":"[Chamado 281] - Direcionar dois protocolos para a CPTM","Card":539,"Status":"Open"},{"Titulo ":"[Chamado 286] - Não consegue baixar o documento anexo","Card":542,"Status":"Open"},{"Titulo ":"[Chamado 290] - Diligência sem prorrogação do prazo","Card":545,"Status":"Open"},{"Titulo ":"Registros de complemento solicitado pelo órgão estão sendo duplicados ou triplicados no momento da criação.","Card":548,"Status":"Open"},{"Titulo ":"[Chamado 298] - Situação \"Encerrada\"","Card":549,"Status":"Open"},{"Titulo ":"[Chamado 302] - Problemas para encerrar uma manifestação","Card":550,"Status":"Open"},{"Titulo ":"[Chamado 273] - No Observatório está faltando as informações do Conselho de usuários, precisamos das seguintes informações:","Card":553,"Status":"Open"},{"Titulo ":"[Chamado 274] - Protocolo duplicado","Card":554,"Status":"Open"},{"Titulo ":"[Chamado 322] - Lentidão no Fala.SP","Card":571,"Status":"Open"},{"Titulo ":"Apresentação Fala 05/12/2025","Card":573,"Status":"Open"},{"Titulo ":"[API EXTERNA] CRIAÇÃO DE SCRIPT DE TESTE AUTOMATIZADO.","Card":575,"Status":"Open"},{"Titulo ":"[Chamado 323] Perfil Tratamento de Resolutividade não faz resolutividade de denúncia (= card 357)","Card":578,"Status":"Open"},{"Titulo ":"[Chamado 326] Protocolo 2025100608030583 duplicado na SEDUC","Card":579,"Status":"Open"},{"Titulo ":"Doação do código fonte do FalaSP para a CGE de Santa Catarina","Card":580,"Status":"Open"},{"Titulo ":"mensagem de erro na criação de uma subunidade já existente na plataforma falaSP.","Card":585,"Status":"Open"},{"Titulo ":"Habilitação Logs  Elasticsearch","Card":590,"Status":"Open"},{"Titulo ":"[Chamado 342] Manifestante LAIS MADALENA DE PAULA SOUZA, está recebendo o parecer das movimentações no e-mail institucional.","Card":592,"Status":"Open"},{"Titulo ":"[Chamado 336] No histórico do protocolo 2025102607204567 consta a troca da manifestação para o mesmo órgão.","Card":594,"Status":"Open"},{"Titulo ":"[Chamado 350] - Subunidade GER DE SERVICE DESK, INFRAESTR E SEG DA INFORMAÇAO criada pela CDHU, não está aparecendo na parte de encaminhamento","Card":599,"Status":"Open"},{"Titulo ":"[Chamado 378] Subunidade não aparece no encaminhamento para tratamento","Card":618,"Status":"Open"},{"Titulo ":"[Chamado 389] Diligência da Polícia Militar está indicando o prazo como vencido","Card":624,"Status":"Open"},{"Titulo ":"Ajuste API Externa Erro api/external/manifestacao/gravaManifestacaoJustificativa","Card":625,"Status":"Open"},{"Titulo ":"[Chamado 387] - Resolutividade de denúncia Sra Mariana Lima 2026012214134266","Card":629,"Status":"Open"},{"Titulo ":"PRODESP - Manifestação 2026011412535477 não aparece subsídio","Card":631,"Status":"Open"},{"Titulo ":"[Chamado 388] - Protocolo 2026012006502360 está em resolutividade, mas não aparece no grid","Card":632,"Status":"Open"},{"Titulo ":"[Chamado 395] Manifestação 2025122615201914, no histórico não aparece a alteração de órgão.","Card":633,"Status":"Open"},{"Titulo ":"[Chamado 396] Manifestações sem tema","Card":634,"Status":"Open"},{"Titulo ":"[Chamado 398] Protocolo 2024062022530271, não está habilitando para publicar","Card":636,"Status":"Open"},{"Titulo ":"LEVANTAMENTO DO FUNCIONAMENTO DE PERFIS PERMISSOES","Card":637,"Status":"Open"},{"Titulo ":"[Chamado 403] - Vários órgãos estão com dificuldade para dar resolutividade mesmo estando só com perfil resolutividade.","Card":638,"Status":"Open"},{"Titulo ":"[Chamado 404] - Aprimorar o sistema Fala SP para interação com os demais órgãos _REQUISITO APROVADO (PRAZO JUN/26)","Card":639,"Status":"Open"},{"Titulo ":"[FalaIA] Incluir Reflexo das Sugestões do FalaIA no Painel Gerencial Interno","Card":641,"Status":"Open"},{"Titulo ":"[API SEDUC] Alinhar e Corrigir Extensões de Arquivos Permitidas entre a API Externa e o FalaSP","Card":642,"Status":"Open"},{"Titulo ":"[FalaIA] Testes de integração do modal de sugestão FalaIA.","Card":643,"Status":"Open"},{"Titulo ":"[Chamado 414] - Implementar relatórios gráficos no ambiente interno do Observatório da Plataforma Fala SP (Requisito)","Card":644,"Status":"Open"},{"Titulo ":"[Chamado 415] FALA.SP discrepâncias no Observatório e no Painel Interno de Gestão, segue anexo e-mail do órgão enviado.","Card":645,"Status":"Open"},{"Titulo ":"[Chamado 416] Interface de Programação de Aplicação (API), até 31 de dezembro de 2026","Card":646,"Status":"Open"},{"Titulo ":"Sistema não permite a inclusão de temas e tags em manifestações.","Card":652,"Status":"Open"},{"Titulo ":"[Chamado 422] SIC 2026020314042741, não foi respeitado o prazo legal de 05 dias","Card":653,"Status":"Open"},{"Titulo ":"Ambiente de PRD - com problemas no filtro Cadastrada e  Em análise","Card":657,"Status":"Open"},{"Titulo ":"[Chamado 435] Usuária não tem perfil para ver manifestações da Secretaria e conforme o print apareceram manifestações.","Card":665,"Status":"Open"},{"Titulo ":"[Chamado 436] Problema Conselho de usuários. Segue reporte do órgão Fundação Casa :","Card":666,"Status":"Open"},{"Titulo ":"[Chamado 437] órgão SEDUC com problema na parte da resolutividade, pelo que parece com a instabilidade gerou problema no protocolo","Card":667,"Status":"Open"},{"Titulo ":"[Chamado 442] Horário do cadastro diferente da hora de Brasília","Card":674,"Status":"Open"},{"Titulo ":"[Chamado 444] reporte do órgão usuário das URE conseguindo colocar reposta, sem perfil de ouvidoria","Card":675,"Status":"Open"},{"Titulo ":"[Freezing] BUG-API-003: Retorno de null em Validação","Card":684,"Status":"Open"},{"Titulo ":"[Chamado 449] Manifestante reportando que não consegue responder a complementação por não ter o botão de salvar","Card":695,"Status":"Open"},{"Titulo ":"Fala SP com contas de usuários sem NOME, E-MAIL e NÍVEL (IMPORTANTE)","Card":696,"Status":"Open"},{"Titulo ":"[Chamado 447] unidades regionais estão aparecendo para encaminhar tipologias reclamação e solicitação de providências","Card":698,"Status":"Open"},{"Titulo ":"feat: Correcoes de cache Redis e comunicacao interna entre pods (cluster URLs)","Card":706,"Status":"Open"},{"Titulo ":"[Chamado 455] SEDUC não consegue mudar tipologia","Card":707,"Status":"Open"},{"Titulo ":"[Chamado 467] Órgão nao consegue criar a TAG","Card":709,"Status":"Open"},{"Titulo ":"Ajuste Erro Erro Detectado Apos Comunicacao Intra Pods","Card":714,"Status":"Open"},{"Titulo ":"Atualizacao Pacotes Nuget FALASP-API","Card":715,"Status":"Open"},{"Titulo ":"[Conselho de usuários] correção na criação de consultas do tipo resposta \"Seleção única\".","Card":716,"Status":"Open"},{"Titulo ":"[Chamado 471] Subunidade de Ouvidoria SEDUC URE SUL 1 conseguiu  postar para o cidadão a resposta da manifestação","Card":717,"Status":"Open"},{"Titulo ":"[Chamado 472] Desloga ao tentar encaminhar manifestações para outro órgão","Card":718,"Status":"Open"},{"Titulo ":"[Chamado 475] Manifestação na subunidade sendo tratada pelo órgão.","Card":721,"Status":"Open"},{"Titulo ":"Botão de \"enviar\" da tela de Encaminhar para tratamento resulta em erro","Card":722,"Status":"Open"},{"Titulo ":"FalaSP-Gestao-Web - Correção Erros Notifificados pelo Roslyn  / MSBuild","Card":723,"Status":"Open"},{"Titulo ":"[Chamado 478] Problema  no salvamento do checklist","Card":724,"Status":"Open"},{"Titulo ":"[Chamado 479] Secretaria da Cultura, reclama de vários pontos da Plataforma","Card":725,"Status":"Open"},{"Titulo ":"[Chamado 480] extração de dados brutos do sistema SIC (PRAZO MAI/26)","Card":726,"Status":"Open"},{"Titulo ":"FalaSP-Gestao-API - Correção Erros Notifificados pelo Roslyn / MSBuild","Card":727,"Status":"Open"},{"Titulo ":"[Chamado 230] [melhoria] Performance de consultas da tela de Pesquisa V2","Card":731,"Status":"Open"},{"Titulo ":"[Chamado 491] Na busca Ações da manifestação, ordenar por ordem alfabética","Card":739,"Status":"Open"},{"Titulo ":"[Chamado 493] Melhorias tela de PESQUISA","Card":741,"Status":"Open"},{"Titulo ":"[Chamado 494] Órgãos reportando lentidão em 01/04","Card":742,"Status":"Open"},{"Titulo ":"[Chamado 500] - SEDUC, área de encaminhamento interno não consegue responder para Ouvidoria:","Card":744,"Status":"Open"},{"Titulo ":"[BUG FIX] Validação de formato de e-mail em manifestações e encaminhamentos","Card":747,"Status":"Open"},{"Titulo ":"[SECURITY] Correção na captura do IP real do cliente (X-Forwarded-For)","Card":748,"Status":"Open"},{"Titulo ":"[BUG FIX] Correção na exclusão de perfis de usuário (Foreign Key Constraint)","Card":749,"Status":"Open"},{"Titulo ":"[PERFORMANCE] Otimizações de Redis e ThreadPool para alta carga","Card":750,"Status":"Open"},{"Titulo ":"[Acesso de múltiplas sessões] renovação de sessão não acontece quando o usuário possui mais de uma aba aberta no FalaSP.","Card":751,"Status":"Open"},{"Titulo ":"[Chamado 518] [Chamado 530]  IA tem alterado o destinatário dos protocolos e errado","Card":752,"Status":"Open"},{"Titulo ":"Otimizacoes OpenShift - Cache-Control PDB deployment service","Card":756,"Status":"Open"},{"Titulo ":"[Chamado 511] Requisitos ATRICON- ajuste na tela do manifestante LAI prazos (PRAZO 15/05)","Card":758,"Status":"Open"},{"Titulo ":"[Chamado 512] Protocolo 2026033108274120 está aparecendo com o texto da denúncia cortada","Card":759,"Status":"Open"},{"Titulo ":"[Chamado 515] Protocolo 2026032720363283 foi possível alterar denúncia Anônima para Pedido de acesso.","Card":761,"Status":"Open"},{"Titulo ":"[Chamado 516] SES/SP recebeu na data de 02/04/2026 Pedidos de informações com data de limite errada","Card":762,"Status":"Open"},{"Titulo ":"[Chamado 527] Reporte STM com problema para dar Resolutividade","Card":767,"Status":"Open"},{"Titulo ":"[Chamado 533] Liberação do Painel Gerencial","Card":768,"Status":"Open"},{"Titulo ":"[Chamado 534] Erro ao clicar em imprimir checklist","Card":769,"Status":"Open"},{"Titulo ":"[Chamado 531] OGE identificou no Observatório que o prazo médio de 2º instância está incorreto, computando 3 dias.","Card":770,"Status":"Open"},{"Titulo ":"[FalaIA] Application/JSON - Troca de configuração de comunicação do serviço de classificação de manifestação.","Card":772,"Status":"Open"},{"Titulo ":"[Frontend] Fonte Rawline via CDN externo bloqueia renderização da interface","Card":773,"Status":"Open"},{"Titulo ":"[falasp-api] Rate Limit: colisao de chave entre login e submit bloqueia usuarios com 429","Card":774,"Status":"Open"},{"Titulo ":"Implementar suporte a Redis Sentinel para failover automatico","Card":775,"Status":"Open"},{"Titulo ":"Modal de verificação de nova versão da aplicação","Card":776,"Status":"Open"},{"Titulo ":"[API SEDUC] Criação de endpoint para consultar protocolos que eram pedidos de acesso a informação para tipologia de ouvidoria.","Card":778,"Status":"Open"},{"Titulo ":"Erro 'too many parameters' (limite 2100 SQL Server) na pesquisa de manifestacoes do gestor","Card":783,"Status":"Open"},{"Titulo ":"Ajustar redirect de logout OIDC para raiz do dominio","Card":784,"Status":"Open"},{"Titulo ":"Adequação de campo \"subunidade\" na resposta do encaminhamento para tratamento.","Card":785,"Status":"Open"},{"Titulo ":"Corrigir header Clear-Site-Data no logout OIDC","Card":787,"Status":"Open"},{"Titulo ":"Corrigir header Clear-Site-Data no logout OIDC","Card":788,"Status":"Open"},{"Titulo ":"Corrigir header Clear-Site-Data no logout OIDC","Card":789,"Status":"Open"},{"Titulo ":"Corrigir header Clear-Site-Data no logout OIDC","Card":790,"Status":"Open"},{"Titulo ":"FALA SP 22/04 - sistema fora do ar","Card":791,"Status":"Open"},{"Titulo ":"[Chamado 536]  CDHU - resposta do encaminhamento não lista subunidades e não consegue anexar arquivo.","Card":792,"Status":"Open"},{"Titulo ":"[Chamado 541] problema para responder as manifestações","Card":793,"Status":"Open"},{"Titulo ":"[Chamado 543] Ajuste no Monitoramento CGE para edição de campos de pedido de acesso - origem 312","Card":794,"Status":"Open"},{"Titulo ":"[Chamado 354] - Encaminhamento mostra nome Companhia de Processamento de Dados - Prodesp e não o Poupatempo","Card":795,"Status":"Open"},{"Titulo ":"[Chamado 545] -  Painel interno Homologação está o mesmo Painel Interno de Produção","Card":796,"Status":"Open"},{"Titulo ":"[Melhoria] Ao se consultar uma manifestação e clicar no botão \"voltar\", a tela de lista perde o filtro anterior","Card":798,"Status":"Open"},{"Titulo ":"[Chamado 550] Erro ao incluir uma imagem .jpg","Card":799,"Status":"Open"},{"Titulo ":"[Chamado 563] Servidores não estão recebendo e-mail de manifestações encaminhadas.","Card":800,"Status":"Open"}],"SP PATRI":[{"Id":1.0,"Origem":"GitLab","Sistema":"SP-Patri","Código":1385.0,"Descrição":"Pacote de Manutençãos do SP-Patri para atendimento do Decreto n° 70.091","Data de Abertura":"2025-11-18","Categoria":"Melhoria","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-23","Estimativa Fim":"2026-08-28","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":"","Descrição":"Processo de apresentação/coleta de declarações","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"","Estimativa Analise":10.0,"Estimativa Início":"2026-03-23","Estimativa Fim":"2026-04-03","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":"","Descrição":"Processo de apuração/análise das declarações","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"","Estimativa Analise":15.0,"Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-24","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":"","Descrição":"Processo de publicação da declarações dos dirigentes","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"","Estimativa Analise":5.0,"Estimativa Início":"2026-04-27","Estimativa Fim":"2026-05-04","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":"","Descrição":"Fase I - Ranking de risco patrimonial","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"","Estimativa Analise":30.0,"Estimativa Início":"2026-06-05","Estimativa Fim":"2026-06-12","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":"","Descrição":"Fase I - Dashboard e relatórios","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"","Estimativa Analise":30.0,"Estimativa Início":"2026-06-15","Estimativa Fim":"2026-07-24","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":"","Descrição":"Fase II - Acesso às declarações de IR","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"","Estimativa Analise":25.0,"Estimativa Início":"2026-07-27","Estimativa Fim":"2026-08-28","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SP-Patri","Código":1405.0,"Descrição":"Implementação da Autenticação Gov.Br - Minha área","Data de Abertura":"","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":19.0,"Estimativa Início":"2026-01-19","Estimativa Fim":"2026-02-05","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"SP-Patri","Código":1478.0,"Descrição":"Identificação e Busca de Dados- INTEGRAÇÃO SGP","Data de Abertura":"","Categoria":"","Status":"Impedimento ","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-13","Estimativa Fim":"2026-04-17","Prioridade":"","Data de Impedimento":"2026-04-16","Observação":"Aguardando retorno RECAD","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"SP-Patri","Código":1478.0,"Descrição":"Regras de Acesso e Avisos- INTEGRAÇÃO SGP","Data de Abertura":"","Categoria":"","Status":"Aguardando Inicio","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Falta retorno dos dados ARH por parte do portal do integrador","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"SP-Patri","Código":1481.0,"Descrição":"Coleta Automática de Valores- PORTAL DA TRANSPARENCIA","Data de Abertura":"","Categoria":"","Status":"Aguardando Inicio","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-13","Estimativa Fim":"2026-05-05","Prioridade":"","Data de Impedimento":"","Observação":"Falta criação de API portal da transparencia ","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"SP-Patri","Código":1482.0,"Descrição":"Envio e Publicação no Site- PORTAL DA TRANSPARENCIA","Data de Abertura":"","Categoria":"","Status":"Aguardando Inicio","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-13","Estimativa Fim":"2026-05-10","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"SP-Patri","Código":1483.0,"Descrição":"Ajustes e Entrada em Produção- PORTAL DA TRANSPARENCIA ","Data de Abertura":"","Categoria":"","Status":"Aguardando Inicio","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-05-10","Estimativa Fim":"2026-05-11","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""}],"SIST BENEFICIOS":[{"Id":10.0,"Origem":"GitLab/Sistema de chamados","Sistema":"Sistema de Beneficios","Código":"1306/167","Descrição":"Gráfico Benefícios Financeiros – Valor (R$) com problemas ","Data de Abertura":"2025-09-11","Categoria":"Correção","Status":"Produção","Responsável":"CGE","Estimativa Analise":5.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-20","Prioridade":"Média","Data de Impedimento":"","Observação":" ","Previsão Produção":"2026-04-14"},{"Id":36.0,"Origem":"GitLab/Sistema de chamados","Sistema":"Sistema de Beneficios","Código":"810/167","Descrição":"Gráficos - Ajuste para adequação de beneficios compartilhados ","Data de Abertura":"2025-05-02","Categoria":"Manutenção","Status":"Produção","Responsável":"CGE","Estimativa Analise":12.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-20","Prioridade":"Média","Data de Impedimento":"","Observação":" ","Previsão Produção":"2026-04-14"},{"Id":44.0,"Origem":"GitLab","Sistema":"Sistema de Beneficios","Código":"573/ 167","Descrição":"Benefícios - Menu relatório analítico visualização ","Data de Abertura":"2025-01-15","Categoria":"Correção","Status":"Produção","Responsável":"CGE","Estimativa Analise":12.0,"Estimativa Início":"2026-10-01","Estimativa Fim":"2026-04-29","Prioridade":"Baixa","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-22"},{"Id":64.0,"Origem":"Sistema de Chamados","Sistema":"Sistema de Beneficios","Código":"1394/344","Descrição":"Ajuste no grafico de beneficios da tela inicial ","Data de Abertura":"2025-12-29","Categoria":"Correção","Status":"Produção","Responsável":"CGE","Estimativa Analise":3.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-20","Prioridade":"Média","Data de Impedimento":"","Observação":" ","Previsão Produção":"2026-04-14"},{"Id":"","Origem":"GitLab","Sistema":"Sistema de Beneficios","Código":1459,"Descrição":"Implementação minha area","Data de Abertura":46207,"Categoria":"Melhoria","Status":"Produção","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"2026-06-04","Estimativa Fim":"2026-08-04","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-14"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"Sistema de Beneficios","Código":523,"Descrição":" tela “Consultar/Cadastrar benefício”","Data de Abertura":46120,"Categoria":"Correção","Status":"Produção","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"2026-04-23","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-14"}],"SCO":[{"Id":28.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":871.0,"Descrição":"SCO - Projeto, listagem de projetos ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":12.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-05","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":29.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":869.0,"Descrição":"SCO - Projeto, campo \"Já foram conduzidas investigações externas relacionadas à fraude nas localidades relevantes? \" ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-05","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":30.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":868.0,"Descrição":"SCO - Projeto, campo Localidade ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-05","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":31.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":867.0,"Descrição":"SCO - Esqueceu sua senha, necessário verificar se o e-mail existe no cadastro do usuário. ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-05","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":32.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":866.0,"Descrição":"SCO - Filtragem avançada ajustes nomes ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"Aberto/Backlog","Responsável":"Negócios","Estimativa Analise":3.0,"Estimativa Início":"2026-03-23","Estimativa Fim":"2026-03-25","Prioridade":"Média","Data de Impedimento":"","Observação":"Definição com a área de negócios CGE","Previsão Produção":""},{"Id":33.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":865.0,"Descrição":"SCO - Tela Lista de usuários e Menu Usuários com as mesmas opções ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":3.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":34.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":864.0,"Descrição":"SCO - ajuste no texto de \"e-mail ou senha inválidos\" ","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":1.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":35.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":863.0,"Descrição":"SCO - Tela recuperar senha, ajuste de logo","Data de Abertura":"2025-05-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":3.0,"Estimativa Início":"2026-02-16","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":39.0,"Origem":"GitLab","Sistema":"Sistema de Controle de Operações","Código":861.0,"Descrição":"Login - Implementação de autenticação multi-fator (MFA) no SCO ","Data de Abertura":"2025-03-10","Categoria":"Manutenção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2026-03-25","Estimativa Fim":"2026-03-31","Prioridade":"Média","Data de Impedimento":"","Observação":"Definição com a área de negócios CGE","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"","Código":"","Descrição":"","Data de Abertura":"","Categoria":"","Status":"","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"OBS: NOVOS REQUISITOS PARA O SISTEMA DE CONTROLE DE OPERAÇÕES","Código":"","Descrição":"","Data de Abertura":"","Categoria":"","Status":"","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""}],"SP AGENDAS":[{"Id":40.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"270/1381","Descrição":"Ajuste na ordenação de compromissos, hospitalidades e minicurrículos.","Data de Abertura":"2025-10-22","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-02-09","Estimativa Fim":"2026-03-18","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-27"},{"Id":52.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"278/1371","Descrição":"Problema no cadastro de compromissos","Data de Abertura":"2025-10-31","Categoria":"Correção","Status":"Encerrado","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-03-04","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"06/03/2026 - encerrado. Suporte ao usuário","Previsão Produção":""},{"Id":1372.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"283/1372","Descrição":"Solicitação de Manutenção para desenvolvimento de uma nova extração que será disponibilizada na parte pública","Data de Abertura":"2025-11-03","Categoria":"Manutenção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-02-09","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"Encerrado","Previsão Produção":"2026-02-27"},{"Id":55.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"340/1390","Descrição":"Manutenção no cadastro de órgãos/entidades","Data de Abertura":"2025-12-26","Categoria":"Manutenção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":9,"Estimativa Início":"2026-02-09","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":60.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"340/1391","Descrição":"Manutenções no cadastro de usuários","Data de Abertura":"2025-12-26","Categoria":"Manutenção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":12,"Estimativa Início":"2026-02-09","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":61.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"340/1392","Descrição":"Implementação de alertas automáticos","Data de Abertura":"2025-12-26","Categoria":"Melhoria","Status":"Impeditivo","Responsável":"Ag. Negócios/ Levantamento ","Estimativa Analise":9,"Estimativa Início":"2026-03-12","Estimativa Fim":"2026-03-20","Prioridade":"baixa","Data de Impedimento":"","Observação":"verificar a definição","Previsão Produção":""},{"Id":62.0,"Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"340/1393","Descrição":"Melhorias no acesso da área pública","Data de Abertura":"2025-12-26","Categoria":"Manutenção","Status":"Impeditivo","Responsável":"CGE","Estimativa Analise":12,"Estimativa Início":"2026-02-09","Estimativa Fim":"2026-03-13","Prioridade":"Média","Data de Impedimento":"","Observação":"Homologação cliente","Previsão Produção":""},{"Id":63.0,"Origem":"GitLab","Sistema":"SP Agendas","Código":679,"Descrição":"Inclusão de calendário interno ","Data de Abertura":"2025-03-06","Categoria":"Melhoria","Status":"Encerrado","Responsável":"CGE","Estimativa Analise":"2026-04-07","Estimativa Início":"","Estimativa Fim":"","Prioridade":"Média","Data de Impedimento":"","Observação":"encerrar o chamado (Daniel)","Previsão Produção":""},{"Id":67.0,"Origem":"GitLab","Sistema":"SP Agendas","Código":1397,"Descrição":"Atualização do manual do sistema SP-Agendas ","Data de Abertura":"2025-12-29","Categoria":"Correção","Status":"Encerrado","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"Média","Data de Impedimento":"","Observação":"encerrar o chamado (Daniel)- ver ajuda editável","Previsão Produção":""},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":430,"Descrição":"Error - Invalid column name ´NaturezaJuricald´","Data de Abertura":"2026-03-02","Categoria":"Correção","Status":"Encerrado","Responsável":"Equipe Desenv","Estimativa Analise":1,"Estimativa Início":"2026-03-12","Estimativa Fim":"2026-03-13","Prioridade":"Média","Data de Impedimento":"","Observação":"Erro não foi mais identificado","Previsão Produção":""},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"411/1427","Descrição":"Menu Administrar - incluir coluna órgão na tela lista de cargos e chefe de Gabinete cargos","Data de Abertura":"2026-02-13","Categoria":"Melhoria","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-03-12","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"410/1421","Descrição":"Área pública, layout desconfigurado - botão pesquisar lista compromissos e lista hospitalidades na funciona adequadamente","Data de Abertura":"2026-02-13","Categoria":"Correção","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-03-12","Estimativa Fim":"2026-03-16","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"1393/340","Descrição":"Disponibilizar a versão e os itens da versão","Data de Abertura":"","Categoria":"Melhoria","Status":"Impeditivo","Responsável":"Ag. Negócios/ Levantamento ","Estimativa Analise":3,"Estimativa Início":"2026-03-12","Estimativa Fim":"2026-03-16","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"448/1426","Descrição":"A responsável pelo preenchimento da agenda do Controlador Geral do Estado solicita a verificação de inconsistência no ato da publicação da agenda. A servidora relata que algumas publicações estão aparecendo com dia ou horário diverso do cadastrado. Também relatou a falta de publicação de compromissos cadastrados com a opção \"publicar\" selecionada.","Data de Abertura":"2026-03-12","Categoria":"Erro","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-18","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"484/1443","Descrição":"Informo que o sistema SP-Agendas aceitou o cadastro de um mesmo servidor com o mesmo e-mail","Data de Abertura":"2026-03-30","Categoria":"Erro","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-31","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"483/1442","Descrição":"Solicito a gentileza de providenciar os seguintes ajustes e melhorias no sistema SP-Agendas, em complemento ao chamado 482:\n1) Ao inativar um servidor, deverá ser informado a data da saída;\n2) Ao reativar o servidor, deverá ser informado a nova data de entrada;\n3) A lista de inativos deve ser disponibilizada no perfil RH de todos os órgãos;\n4) É preciso criar o filtro \"Inativos\" na área pública, disponibilizando a agenda no período em que se encontrava ativo.","Data de Abertura":"2026-03-30","Categoria":"Melhoria","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-31","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"482/1441","Descrição":"1. Na lista de Usuários, substituir o botão \"Excluir\" por \"Inativar\";\n2. Incluir um filtro de \"Inativos\";\n3. Quando for selecionado esse filtro, deverá ser apresentado o botão \"Reativar\" no cadastro. Isso se deve, pois um ex-servidor pode retornar ao serviço público, principalmente comissionados;\n4. Ao inativar uma autoridade, as informações na área públia deverão permanecer disponíveis\n\n","Data de Abertura":"2026-03-30","Categoria":"Melhoria","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-31","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-13"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"508/1452","Descrição":"Melhorias referentes natureza juridica ","Data de Abertura":"2026-02-04","Categoria":"Melhoria","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"2026-04-14","Prioridade":"média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-14"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"514/1457","Descrição":"exclusão dos órgãos e entidades, abaixo relacionados","Data de Abertura":"2026-02-05","Categoria":"Melhoria","Status":"PRODUÇÃO","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":46126,"Prioridade":"média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-10"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"540/1488","Descrição":"precisa ficar gerando nova senha reiteradamente","Data de Abertura":"","Categoria":"Correção","Status":"aberto/ Backlog","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Rodrigo Marnon","Previsão Produção":""},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SP Agendas","Código":"539/1487","Descrição":"Melhorias na visualização ","Data de Abertura":"","Categoria":"Melhoria","Status":"Homologação ","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""}],"LINCE":[{"Id":2.0,"Origem":"GitLab","Sistema":"LINCE","Código":1383,"Descrição":"Refinamento dos prompts responsáveis pela geração de alertas","Data de Abertura":"2025-12-18","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2025-12-22","Estimativa Fim":"2026-02-27","Prioridade":"Urgente","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-09"},{"Id":3.0,"Origem":"GitLab","Sistema":"LINCE","Código":1379,"Descrição":"Parametrização - Criação de nova opção para geração de alertas ","Data de Abertura":"2025-12-16","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2025-12-16","Estimativa Fim":"2026-01-26","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-14"},{"Id":58.0,"Origem":"GitLab","Sistema":"LINCE","Código":1387,"Descrição":"Problema na geração do alerta A3","Data de Abertura":"2025-12-23","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2025-12-23","Estimativa Fim":"2026-02-27","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-27"},{"Id":69.0,"Origem":"GitLab","Sistema":"LINCE","Código":1399,"Descrição":"Erro na exclusão de alertas","Data de Abertura":"2026-01-07","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2026-01-07","Estimativa Fim":"2026-02-27","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-27"},{"Id":70.0,"Origem":"GitLab","Sistema":"LINCE","Código":1400,"Descrição":"Análise de 2 licitações que não estão sendo exibidas no sistema","Data de Abertura":"2026-01-07","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2026-03-05","Estimativa Fim":"2026-03-09","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"09/03/206"},{"Id":"","Origem":"GitLab","Sistema":"LINCE","Código":1414,"Descrição":"Possibilitar ordenação da tela de parametrização","Data de Abertura":"2026-03-11","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":2.0,"Estimativa Início":"2026-03-11","Estimativa Fim":"2026-03-13","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-13"},{"Id":"","Origem":"GitLab","Sistema":"LINCE","Código":1413,"Descrição":"Melhoria no processamento de cargas de licitações","Data de Abertura":"2026-03-02","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":2.0,"Estimativa Início":"2026-03-02","Estimativa Fim":"2026-03-04","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-13"},{"Id":"","Origem":"GitLab","Sistema":"LINCE","Código":1420,"Descrição":"Erro na exclusão de usuários","Data de Abertura":"2026-03-16","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-17","Estimativa Fim":"2026-03-17","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2023-03-20"},{"Id":"","Origem":"GitLab/Sistemas de chamados","Sistema":"LINCE","Código":"1428/465","Descrição":"Análise Funcionalidade IA","Data de Abertura":"2026-03-19","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-03-19","Estimativa Fim":"2026-03-26","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-26"},{"Id":"","Origem":"GitLab/Sistemas de chamados","Sistema":"LINCE","Código":503,"Descrição":"verificar a divergência na carga das licitações, em ambiente de produção x homologação, tendo como exemplo a carga do dia 02/04/2026.\nEm ambiente de homologação foram 153 registros, já em produção foram 76 registros.","Data de Abertura":"2026-04-02","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-02","Estimativa Fim":"2026-04-29","Prioridade":"","Data de Impedimento":"","Observação":"em avaliação contínua pelo Desenvolvedor","Previsão Produção":""},{"Id":"","Origem":"GitLab/Sistemas de chamados","Sistema":"LINCE","Código":538,"Descrição":"Ao tentar filtrar as licitações com modalidade \"Dispensa de Licitação\"","Data de Abertura":"","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-15","Estimativa Fim":"2026-04-15","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-15"},{"Id":"","Origem":"GitLab/Sistemas de chamados","Sistema":"LINCE","Código":1486,"Descrição":"Implementaçõ do portal Minha Área - login via govbr","Data de Abertura":"2026-04-15","Categoria":"Melhoria","Status":"Desenvolvimento","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-16","Estimativa Fim":"2026-04-28","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""}],"SIRLI":[{"Id":41.0,"Origem":"GitLab","Sistema":"SIRLI","Código":660.0,"Descrição":"SIRLI - Esqueci a senha","Data de Abertura":"2025-02-10","Categoria":"Manutenção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5.0,"Estimativa Início":"2025-12-10","Estimativa Fim":"2026-02-28","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-28"},{"Id":42.0,"Origem":"GitLab","Sistema":"SIRLI","Código":659.0,"Descrição":"SIRLI - Perfil de acesso","Data de Abertura":"2025-02-10","Categoria":"Manutenção","Status":"Homologação","Responsável":"CGE","Estimativa Analise":5.0,"Estimativa Início":"2026-05-14","Estimativa Fim":"2026-05-20","Prioridade":"Média","Data de Impedimento":"","Observação":"Homologação","Previsão Produção":""},{"Id":43.0,"Origem":"GitLab","Sistema":"SIRLI","Código":658.0,"Descrição":"SIRLI - Cadastro de usuários","Data de Abertura":"2025-02-10","Categoria":"Manutenção","Status":"Homologação","Responsável":"CGE","Estimativa Analise":5.0,"Estimativa Início":"2025-12-18","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"Homologação","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SIRLI","Código":1410.0,"Descrição":"Integração com a base de dados da SERPRO -  Compras Gov.br","Data de Abertura":"2025-02-10","Categoria":"Manutenção  Integração","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":26.0,"Estimativa Início":"2026-03-06","Estimativa Fim":"2026-04-30","Prioridade":"alta","Data de Impedimento":"","Observação":"Prioridade - Informação está no Data Lake da CGE e precisa definir como será consumo das informações (API? Arquivo ?)","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SIRLI","Código":1460.0,"Descrição":"Tela de início - ÚLTIMAS CONSULTAS' o histórico do sistema ","Data de Abertura":"","Categoria":"","Status":"aberto/ backlog","Responsável":"requisitos","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Levantar requisitos, aguardando prioridade","Previsão Produção":""},{"Id":"","Origem":"GitLab","Sistema":"SIRLI","Código":"","Descrição":"Aba indicadores - levantamento de requisitos","Data de Abertura":"","Categoria":"","Status":"aberto/ backlog","Responsável":"Requisitos","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Levantar requisitos, aguardando prioridade","Previsão Produção":""}],"SPCI":[{"Id":46.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"276/1384","Descrição":"Ajuste no filtro de agentes públicos para o perfil CGE","Data de Abertura":"2025-10-28","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":4,"Estimativa Início":"2026-02-04","Estimativa Fim":"2026-02-11","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2025-12-22"},{"Id":47.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"303/1361","Descrição":"Incluir o filtro de busca pelo nome no perfil RH","Data de Abertura":"2025-11-14","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":2,"Estimativa Início":"2026-02-04","Estimativa Fim":"2026-02-11","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-25"},{"Id":48.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"304/1362","Descrição":"Problema na alteração de cargos de agentes","Data de Abertura":"2025-11-14","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-02-04","Estimativa Fim":"2026-03-06","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-11"},{"Id":49.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"308/1363","Descrição":"Problema no cadastro de 2 usuários","Data de Abertura":"2025-11-17","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":2,"Estimativa Início":"2026-01-26","Estimativa Fim":"2026-02-11","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-24"},{"Id":50.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"314/1360","Descrição":"Problema de autenticação de um servidor em especifico","Data de Abertura":"2025-11-25","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"-","Estimativa Início":"2026-01-25","Estimativa Fim":"2026-01-14","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-01-14"},{"Id":51.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"328/1376","Descrição":"Problema na alteração de cadastro de um usuário","Data de Abertura":"2025-12-15","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"-","Estimativa Início":"2026-01-28","Estimativa Fim":"2026-01-28","Prioridade":"Média","Data de Impedimento":"","Observação":"Produção","Previsão Produção":"2026-02-24"},{"Id":54.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"338/1388","Descrição":"Perfil Agente Público - Preenchimento de nova DCI com novo vinculo com iniciativa privada","Data de Abertura":"2025-12-26","Status":"Produção","Responsável":"CGE","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Homologação cliente","Previsão Produção":"2026-03-11"},{"Id":59.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"341/1425","Descrição":"Manutenções solicitadas para o acesso do perfil CGE ","Data de Abertura":"2025-12-26","Status":"Produção","Responsável":"Clovis","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-16"},{"Id":65.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"341/1396","Descrição":"Manutençãos no formulário de preenchimento da DCI ","Data de Abertura":"2025-12-26","Status":"Produção","Responsável":"CGE","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Homologação cliente","Previsão Produção":"2026-03-11"},{"Id":66.0,"Origem":"GitLab","Sistema":"SPCI","Código":396,"Descrição":"Implementação de autenticação GOV.BR","Data de Abertura":"2024-10-28","Status":"Produção","Responsável":"CGE","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Homologação cliente e Asper","Previsão Produção":"2026-03-20"},{"Id":68.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"349/1398","Descrição":"Erro no login de um usuário","Data de Abertura":"2026-01-06","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"-","Estimativa Início":"2026-01-06","Estimativa Fim":"2026-01-14","Prioridade":"Alta","Data de Impedimento":"","Observação":"Produção","Previsão Produção":"2026-01-14"},{"Id":71.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"353/1401","Descrição":"Remover botão de exportação da lista de declarantes","Data de Abertura":"2026-01-08","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"-","Estimativa Início":"2026-01-08","Estimativa Fim":"2026-01-21","Prioridade":"Alta","Data de Impedimento":"","Observação":"Produção","Previsão Produção":"2026-01-20"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"439/1424","Descrição":"Solicitamos a implementação de uma melhoria para impedir o envio de recurso no SPCIidentificar se cabe ou não ao consulente interpor recurso.","Data de Abertura":"2026-03-05","Status":"Impeditivo","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"Aguardando retorno da liane com as devolutivas de negócio","Previsão Produção":""},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"429/1489","Descrição":"Solicito a gentileza de efetuar as seguintes correções e melhorias no SPCI:\n1) No perfil Agente Público, é preciso disponibilizar a visualização da Ementa (resposta) ao agente público que está efetuando a consulta. Algo semelhante à janela que aparece no Perfil CGE;\n","Data de Abertura":"2026-02-27","Status":"Homologação ","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"2026-03-22","Estimativa Fim":"2026-04-29","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"421/1418","Descrição":"Solicito a verificação de possível erro no SPCI referente à atualização das DCIs entregues pelas autoridades.\n","Data de Abertura":"2026-02-25","Status":"Produção","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"412/1417","Descrição":"Solicito a gentileza de realizar as seguintes melhorias no SPCI:\n1) Histórico de Comunicação - No título das caixas de mensagens, ao solicitar complementação de resposta e a resposta enviada, substituir \"Unidade de Gestão Interna\" por \"Unidade de Gestão de Integridade\":\n","Data de Abertura":"2026-02-13","Status":"Produção","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"365/1406","Descrição":"Perfil Agente Público (com DCI)\n1) Excluir o botão de \"Enviar e-mail de cobrança\" na Lista de declarantes;","Data de Abertura":"2026-01-15","Status":"Produção","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"304/1362","Descrição":"Problema na alteração de cargos de agentes","Data de Abertura":"2026-01-07","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-02-04","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-24"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"1425/341","Descrição":"Melhorias solicitadas para o acesso perfil CGE (item 1a)","Data de Abertura":"2026-01-29","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":15,"Estimativa Início":"2026-04-01","Estimativa Fim":"2026-04-15","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-16"},{"Id":"","Origem":"GitLab","Sistema":"SPCI","Código":"1396/341","Descrição":"Melhorias solicitadas para o acesso perfil CGE (item 1b)","Data de Abertura":"2026-12-30","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"2026-03-03","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-24"},{"Id":"","Origem":"GitLab","Sistema":"SPCI","Código":"365/1406","Descrição":"Pacote de melhorias no SPCI","Data de Abertura":"2026-01-21","Status":"Produção","Responsável":"CGE","Estimativa Analise":12,"Estimativa Início":"2026-02-09","Estimativa Fim":"2026-03-06","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"GitLab","Sistema":"SPCI","Código":"1408/382","Descrição":"Problema no acesso da tela de consulta de conflito de interesse - Perfil UGI","Data de Abertura":"2026-01-26","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-02-04","Estimativa Fim":"2026-02-11","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-24"},{"Id":"","Origem":"GitLab","Sistema":"SPCI","Código":396,"Descrição":"Implementação de autenticação GOV.BR - Minha área","Data de Abertura":"2024-10-28","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":12,"Estimativa Início":"2026-02-20","Estimativa Fim":"2026-03-06","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-24"},{"Id":"","Origem":"GitLab","Sistema":"SPCI","Código":"338/1388","Descrição":"Perfil Agente Público - Preenchimento de nova DCI com novo vinculo com iniciativa privada","Data de Abertura":"2026-12-26","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":20,"Estimativa Início":"2026-01-23","Estimativa Fim":"2026-03-03","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-24"},{"Id":"","Origem":"GitLab","Sistema":"SPCI","Código":"1417/412","Descrição":"Melhorias SPCI","Data de Abertura":"2026-03-16","Status":"Produção","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"2026-03-16","Estimativa Fim":"2026-03-26","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"459/1440","Descrição":"solicito a exclusão do botão \"nova declaração\" na página \"lista de declarantes\" do perfil Gestor RH","Data de Abertura":"2026-03-19","Status":"Produção","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"2026-03-30","Estimativa Fim":"2026-04-01","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"466/1444","Descrição":"Solicito a exclusão da DECLARAÇÃO DE CONFLITO DE INTERESSES da Lúcia de Fátima Furlan Borges, da FAMEMA","Data de Abertura":"2026-03-19","Status":"Produção","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"2026-03-30","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-10"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"509/1453","Descrição":"incluir o botão \"Exportar\" no menu \"Gerenciamento\" > \"Agentes Públicos\"","Data de Abertura":"2026-02-04","Status":"Produção","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"2026-04-22","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-14"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":501,"Descrição":"Precisa cadastrar 02 novos cadastros no Minha área para o SPCI","Data de Abertura":46026,"Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":1467.0,"Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"521/1467","Descrição":"Colunas ocultas, \"Data de Posse\" e \"Enviado em\" na tela \"Lista de declarantes\"","Data de Abertura":46207,"Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"2026-04-22","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-16"},{"Id":"","Origem":"Sistema de Chamados","Sistema":"SPCI","Código":"1485/537","Descrição":"Indisponibilidade do sistema ","Data de Abertura":"","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-16"}],"STRIX":[{"Id":4.0,"Origem":"GitLab","Sistema":"STRIX","Código":436,"Descrição":"STRIX - Relatórios\nDesenvolvimento da funcionalidade geração de relatórios do STRIX. Segue em anexo o documento de requisitos completo e o link das telas prototipadas","Data de Abertura":"2024-11-01","Categoria":"Correção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":13,"Estimativa Início":"2026-05-08","Estimativa Fim":"2026-05-26","Prioridade":"Média","Data de Impedimento":"","Observação":"Validar com o cliente a demanda","Previsão Produção":""},{"Id":5.0,"Origem":"GitLab","Sistema":"STRIX","Código":695,"Descrição":"Ajustes no backend para o vínculo entre um CPF/CNPJ","Data de Abertura":"2025-03-21","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-02-06","Estimativa Fim":"2026-02-06","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-06"},{"Id":6.0,"Origem":"GitLab","Sistema":"STRIX","Código":795,"Descrição":"API STRIX - TSE - Tribunal Superior Eleitoral ","Data de Abertura":"2025-05-02","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-03-13","Estimativa Fim":"2026-03-26","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-01-23"},{"Id":7.0,"Origem":"GitLab","Sistema":"STRIX","Código":808,"Descrição":"API - TSE - Consulta de Doações Politicas ","Data de Abertura":"2025-05-02","Categoria":"Correção","Status":"Produção","Responsável":"Vitor","Estimativa Analise":"","Estimativa Início":"2025-07-30","Estimativa Fim":"2026-02-06","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-06"},{"Id":8.0,"Origem":"GitLab","Sistema":"STRIX","Código":957,"Descrição":"Nova funcionalidade - Implementação de um Relatório Investigativo\nO cliente solicitou que seja realizada a implementação de uma nova funcionalidade que gere um relatório investigativo de uma pessoa física/jurídica.\nEssa funcionalidade irá gerar um documento completo com todo o histórico da pessoa/empresa.\nEssa funcionalidade será implementada em um segundo momento. E também precisamos levantar os requisitos completos sobre essa demanda.","Data de Abertura":"2025-06-23","Categoria":"Melhoria","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":12,"Estimativa Início":"2026-05-27","Estimativa Fim":"2026-06-11","Prioridade":"Média","Data de Impedimento":"","Observação":"VALIDAR COM O CLIENTE A DEMANDA","Previsão Produção":""},{"Id":9.0,"Origem":"GitLab","Sistema":"STRIX","Código":958,"Descrição":"Consulta Pessoa Física e Júridica - Gerar um relatório PDF com os dados retornados dessas consultas","Data de Abertura":"2025-06-23","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":12,"Estimativa Início":"2026-02-23","Estimativa Fim":"2026-03-10","Prioridade":"Alta","Data de Impedimento":"","Observação":"Enviado e-mail : 30/03/2026\nSolicitados pequenos ajustes","Previsão Produção":"2026-04-01"},{"Id":11.0,"Origem":"GitLab","Sistema":"STRIX","Código":976,"Descrição":"API Strix - Portal da Transparência CGU - Despesas Favorecidos - Implementação de API para consulta no banco ","Data de Abertura":"2025-06-27","Categoria":"Correção","Status":"Produção","Responsável":"Edivan, Vitor","Estimativa Analise":"4h (Vitor)","Estimativa Início":"8h (Edivan)","Estimativa Fim":"2026-01-26","Prioridade":"Urgente","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-01-26"},{"Id":12.0,"Origem":"GitLab","Sistema":"STRIX","Código":977,"Descrição":"API Strix - Portal da Transparência CGU - Acordos de Leniência - Implementação de API para consulta no banco ","Data de Abertura":"2025-06-27","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":3,"Estimativa Início":"2026-02-20","Estimativa Fim":"2026-02-25","Prioridade":"Urgente","Data de Impedimento":"","Observação":"Enviado e-mail : 30/03/2026","Previsão Produção":"2026-03-13"},{"Id":13.0,"Origem":"GitLab","Sistema":"STRIX","Código":979,"Descrição":"API Strix - Portal da Transparência CGU - CEIS - Implementação de API para consulta no banco ","Data de Abertura":"","Categoria":"Correção","Status":"Produção","Responsável":"Edivan","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"2026-01-26","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-01-26"},{"Id":14.0,"Origem":"GitLab","Sistema":"STRIX","Código":980,"Descrição":"API Strix - Portal da Transparência CGU - CEAF - Implementação de API para consulta no banco ","Data de Abertura":"2025-06-27","Categoria":"Correção","Status":"Produção","Responsável":"Edivan","Estimativa Analise":"-","Estimativa Início":"6 horas","Estimativa Fim":"2026-01-26","Prioridade":"Urgente","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-01-26"},{"Id":15.0,"Origem":"GitLab","Sistema":"STRIX","Código":981,"Descrição":"API Strix - Portal da Transparência CGU - PEP - Implementação de API para consulta no banco ","Data de Abertura":"2025-06-27","Categoria":"Correção","Status":"Produção","Responsável":"Edivan","Estimativa Analise":"-","Estimativa Início":"6 horas","Estimativa Fim":"2026-01-26","Prioridade":"Urgente","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-01-26"},{"Id":16.0,"Origem":"GitLab","Sistema":"STRIX","Código":993,"Descrição":"Consulta PF e PJ - Incluir data de atualização da informação","Data de Abertura":"2025-07-01","Categoria":"Melhoria","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":9,"Estimativa Início":"2026-03-13","Estimativa Fim":"2026-03-26","Prioridade":"Alta","Data de Impedimento":"","Observação":"VALIDAR COM O CLIENTE A DEMANDA","Previsão Produção":""},{"Id":17.0,"Origem":"GitLab","Sistema":"STRIX","Código":1043,"Descrição":"Comparador Societário - Ajuste no endpoint de filiais","Data de Abertura":"2025-07-08","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":10,"Estimativa Início":"2026-03-30","Estimativa Fim":"2026-04-01","Prioridade":"Alta","Data de Impedimento":"","Observação":"AJUSTADO O FRONTEND","Previsão Produção":"2026-04-01"},{"Id":18.0,"Origem":"GitLab","Sistema":"STRIX","Código":1052,"Descrição":"Match - Ajuste na visualização de grafos individuais","Data de Abertura":"2025-07-15","Categoria":"Correção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":10,"Estimativa Início":"2026-07-20","Estimativa Fim":"2026-07-31","Prioridade":"Alta","Data de Impedimento":"","Observação":"Grau de complexidade extremo e necessário alinhar com toda a estrutura de APIs disponíveis.","Previsão Produção":""},{"Id":19.0,"Origem":"GitLab","Sistema":"STRIX","Código":1137,"Descrição":"Consulta de PF - Ajuste no retorno dos dados ARH ","Data de Abertura":"2025-07-29","Categoria":"Correção","Status":"Impeditivo","Responsável":"Equipe Desenv","Estimativa Analise":9,"Estimativa Início":"2026-03-13","Estimativa Fim":"2026-04-10","Prioridade":"Alta","Data de Impedimento":"","Observação":"02/04/2026 - Encaminhado e-mail para o coordenador do Integrador. Estão avaliando o problema, Problema relacionado a API ARH que não está mais disponivel ","Previsão Produção":""},{"Id":20.0,"Origem":"GitLab","Sistema":"STRIX","Código":1141,"Descrição":"Consulta de PJ - Incluir nova aba \"Indicadores\"","Data de Abertura":"2025-07-29","Categoria":"Melhoria","Status":"Aberto/Backlog","Responsável":"Negócios ","Estimativa Analise":5,"Estimativa Início":"2026-03-27","Estimativa Fim":"2026-04-10","Prioridade":"Baixa","Data de Impedimento":"","Observação":"SIRLI: FATURAMENTO ANUAL, FAIXA DE FUNCIONÁRIOS E PARTICIPAÇÕES EMPRESAS  - PRECISA SABER DE ONDE VEM ESSES DADOS? TB NÃO É EXIBIDO NO SIRLI\nSE FOR OS VALORES TOTAIS DO CONTRATOS  SÓ FALTA O FRONTEND","Previsão Produção":""},{"Id":21.0,"Origem":"GitLab","Sistema":"STRIX","Código":1144,"Descrição":"Consulta de PJ - Alertas - Incluir informações de análise de risco","Data de Abertura":"2025-07-29","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-27","Prioridade":"Baixa","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-17"},{"Id":22.0,"Origem":"GitLab","Sistema":"STRIX","Código":1146,"Descrição":"Consulta de PF - Dados Agrupados - Inclusão de nova fonte (Demonstrativos) ","Data de Abertura":"2025-07-29","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5,"Estimativa Início":"2026-04-13","Estimativa Fim":"2026-04-17","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-09"},{"Id":23.0,"Origem":"GitLab","Sistema":"STRIX","Código":1189,"Descrição":"Ajustes no grafo - Permitir a busca por outros campos","Data de Abertura":"2025-08-06","Categoria":"Manutenção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":26,"Estimativa Início":"2026-05-08","Estimativa Fim":"2026-06-12","Prioridade":"Baixa","Data de Impedimento":"","Observação":"Grau de complexidade extremo e necessário alinhar com toda a estrutura de APIs disponíveis.","Previsão Produção":""},{"Id":24.0,"Origem":"GitLab","Sistema":"STRIX","Código":1190,"Descrição":"Ajustes no grafo - Permitir a busca por partes do documento","Data de Abertura":"2025-08-06","Categoria":"Manutenção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":26,"Estimativa Início":"2026-05-08","Estimativa Fim":"2026-06-12","Prioridade":"Alta","Data de Impedimento":"","Observação":"Grau de complexidade extremo e necessário alinhar com toda a estrutura de APIs disponíveis.","Previsão Produção":""},{"Id":25.0,"Origem":"GitLab","Sistema":"STRIX","Código":1233,"Descrição":"API - Portal da Transparência - Contratos - Implementação da API ","Data de Abertura":"2025-08-21","Categoria":"Correção","Status":"Produção","Responsável":"-","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"2026-02-06","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-06"},{"Id":26.0,"Origem":"GitLab","Sistema":"STRIX","Código":1234,"Descrição":"API - Portal da Transparência - Licitações - Implementação da API ","Data de Abertura":"2025-08-21","Categoria":"Correção","Status":"Produção","Responsável":"-","Estimativa Analise":"-","Estimativa Início":"-","Estimativa Fim":"2026-02-06","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-06"},{"Id":27.0,"Origem":"GitLab","Sistema":"STRIX","Código":1319,"Descrição":"Rede de Relacionamentos - Ajuste na exibição dos grafos","Data de Abertura":"2025-10-01","Categoria":"Correção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":10,"Estimativa Início":"2026-07-20","Estimativa Fim":"2026-07-31","Prioridade":"Média","Data de Impedimento":"","Observação":"Grau de complexidade extremo e necessário alinhar com toda a estrutura de APIs disponíveis.","Previsão Produção":""},{"Id":37.0,"Origem":"GitLab","Sistema":"STRIX","Código":1349,"Descrição":"Ajuste no grafo para casos de empresas baixadas ","Data de Abertura":"2025-11-26","Categoria":"Correção","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":26,"Estimativa Início":"2026-06-15","Estimativa Fim":"2026-07-20","Prioridade":"Média","Data de Impedimento":"","Observação":"Grau de complexidade extremo e necessário alinhar com toda a estrutura de APIs disponíveis.","Previsão Produção":""},{"Id":38.0,"Origem":"GitLab","Sistema":"STRIX","Código":1366,"Descrição":"Ajuste na tela inicial do STRIX de ultimas consultas e principais consultas","Data de Abertura":"2025-12-01","Categoria":"Correção","Status":"Produção","Responsável":"Cesar","Estimativa Analise":"-","Estimativa Início":"4 horas","Estimativa Fim":"2026-02-26","Prioridade":"Urgente","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-26"},{"Id":45.0,"Origem":"GitLab","Sistema":"STRIX","Código":1373,"Descrição":"Alteração da referência de base para geração dos grafos","Data de Abertura":"2025-12-11","Categoria":"Correção","Status":"Produção","Responsável":"-","Estimativa Analise":"-","Estimativa Início":"2 horas","Estimativa Fim":"2026-02-26","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-02-26"},{"Id":56.0,"Origem":"GitLab","Sistema":"STRIX","Código":1374,"Descrição":"Implementação de novas bases do B-Cadastro (Simples Nacional e CAEPF)","Data de Abertura":"2025-12-11","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":40,"Estimativa Início":"2026-03-09","Estimativa Fim":"2026-05-07","Prioridade":"Urgente","Data de Impedimento":"","Observação":"AJUSTADO O FRONTEND","Previsão Produção":"2026-04-01"},{"Id":57.0,"Origem":"GitLab","Sistema":"STRIX","Código":1378,"Descrição":"Ajustes no cadastro de perfis de acesso ","Data de Abertura":"2025-12-16","Categoria":"Correção","Status":"Produção","Responsável":"Edivan","Estimativa Analise":"-","Estimativa Início":"4 horas","Estimativa Fim":"2026-02-26","Prioridade":"Urgente","Data de Impedimento":"Após testes, a atividade voltou para o backog para corrigir 2 itens. Esses dois itens depende da atuação no frontend.","Observação":"","Previsão Produção":"2026-02-26"},{"Id":72.0,"Origem":"GitLab","Sistema":"STRIX","Código":1402,"Descrição":"Criação de um usuário Auditor","Data de Abertura":"2026-01-10","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":10,"Estimativa Início":"2026-01-12","Estimativa Fim":"2026-03-18","Prioridade":"Média","Data de Impedimento":"","Observação":"Enviado e-mail : 30/03/2026\nSolicitados pequenos ajustes","Previsão Produção":"2026-04-01"},{"Id":"","Origem":"GitLab","Sistema":"STRIX","Código":1407,"Descrição":"Ajuste na consulta de pessoa física na base do Portal da Transparência","Data de Abertura":"2026-01-23","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":5,"Estimativa Início":"2026-05-04","Estimativa Fim":"2026-05-08","Prioridade":"Média","Data de Impedimento":"","Observação":"Enviado e-mail : 30/03/2026","Previsão Produção":"2026-04-01"},{"Id":"","Origem":"Chamado","Sistema":"STRIX","Código":464,"Descrição":" Inconsistências na aba \"PNCP\"\nProblema: alguns CNPJS aparecem no PNCP, outros que também deveriam estar não. Exemplos:\n-CNPJ 07860761000243 - NÃO APARECE - Não há dados disponíveis\n-CNPJ 22086683000346 - NÃO APARECE - Não há dados disponíveis\n-CNPJ 01590728000264 - APARECE PNCP\n-CNPJ 05625875000100 - NÃO APARECE - Não há dados disponíveis\n-CNPJ 36145599000107 - NÃO APARECE - Não há dados disponíveis","Data de Abertura":"2026-03-18","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-06-25","Estimativa Fim":"2026-04-23","Prioridade":"Alta","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-17"},{"Id":"","Origem":"Chamado","Sistema":"STRIX","Código":463,"Descrição":" Perfil administrador - implementar funcionalidade reenviar senha para o usuário cadastrado.","Data de Abertura":"2026-03-18","Categoria":"Melhoria","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-06-25","Estimativa Fim":"2026-04-02","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-01"},{"Id":"","Origem":"Chamado","Sistema":"STRIX","Código":462,"Descrição":"DOADORES TSE - Dados inconsistentes. \nQuando aparece que uma pessoa foi doadora, aparece o nome do candidato, mas nao aparece nenhum dado. Por exemplo, de que municpio, partido, ou cargo. Esses dados estao disponíveis no TSE.","Data de Abertura":"2026-03-18","Categoria":"Melhoria","Status":"Aberto/Backlog","Responsável":"Negocios","Estimativa Analise":"","Estimativa Início":"2026-06-25","Estimativa Fim":"2026-04-08","Prioridade":"Média","Data de Impedimento":"","Observação":"INFORMAR OS DADOS COMPLEMENTARES (VER REQUISITO)","Previsão Produção":""},{"Id":"","Origem":"Chamado","Sistema":"STRIX","Código":461,"Descrição":"Tela de administração de perfis:\n1-quando vc acrescenta uma pessoa/novo perfil, a tela não retorna para a pagina inicial após a inserção dos dados de um novo usuário\n2- Vc cadastra o usuário com o email e senha . Mas a tela que aparece para logar aparece com CPF.\n3- Conforme já alinhado com a Alicia e Carol, quando se busca un CPF - a aba do Bcadastro deveria ficar aberta (de ínicio, automática). De CNPJS também.","Data de Abertura":"2026-03-18","Categoria":"Correção","Status":"Validar com usuario","Responsável":"CGE","Estimativa Analise":"","Estimativa Início":"2026-06-25","Estimativa Fim":"2026-04-08","Prioridade":"Média","Data de Impedimento":"","Observação":"Camacho tinha pedido p ficar nesse formato, devera ser alterado?","Previsão Produção":""},{"Id":"","Origem":"Chamado","Sistema":"STRIX","Código":460,"Descrição":"Funcionalidade recuperação de senha não funciona","Data de Abertura":"2026-03-18","Categoria":"Correção","Status":"Produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-06-25","Estimativa Fim":"2026-04-02","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-03-31"},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"476/1451","Descrição":"Consulta da placa do veículo não está funcionando","Data de Abertura":"2026-04-02","Categoria":"Erro","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"486/1450","Descrição":"Já foi solicitado a inclusão do nome do nome do proprietário do CPF ou do CNPJ. Mas até agora não foi implementado.","Data de Abertura":"2026-04-02","Categoria":"Melhoria","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-02"},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":488,"Descrição":"ERRO - Recuperação de senha dá erro","Data de Abertura":"2026-04-02","Categoria":"Erro","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"Aguardando agenda com cliente","Previsão Produção":""},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":489,"Descrição":" ERRO DE LOGIN - QUANDO TENTA LOGAR DA ERRO","Data de Abertura":"2026-04-02","Categoria":"Erro","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"Aguardando agenda com cliente","Previsão Produção":""},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"505/1448","Descrição":"ERRO PEP -Estão verificando apenas o \"miolo (CPF anonimizado), sem associar o nome da lista","Data de Abertura":"2026-04-02","Categoria":"Erro","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-02"},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"506/1449","Descrição":"Texto/BASE - Vínculo deve estar acompanhada de parentesis (SP) - para indicar que a base é restrit","Data de Abertura":"2026-04-02","Categoria":"Erro","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-02"},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"507/1456","Descrição":"COR do Relatório - O que é verde deveria estar em vermelho e vice-versa","Data de Abertura":"2026-04-02","Categoria":"Erro","Status":"Em produção","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"2026-04-06","Estimativa Fim":"2026-04-10","Prioridade":"Média","Data de Impedimento":"","Observação":"","Previsão Produção":"2026-04-07"},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"","Descrição":"Documento sobre API ","Data de Abertura":"","Categoria":"","Status":"Aberto/Backlog","Responsável":"Equipe Desenv","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"Sistema de chamados","Sistema":"STRIX","Código":"1490 card","Descrição":"API- Cadastro de OBRAS E DIVIDA ATIVA DA UNIÃO ","Data de Abertura":"","Categoria":"","Status":"Em desenvolvimento ","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""},{"Id":"","Origem":"","Sistema":"","Código":546,"Descrição":"dados das eleições estão muito extensos","Data de Abertura":"","Categoria":"","Status":"","Responsável":"","Estimativa Analise":"","Estimativa Início":"","Estimativa Fim":"","Prioridade":"","Data de Impedimento":"","Observação":"","Previsão Produção":""}]};
+
+// ─── STATE ───
+let SHEETS = {};
+let current = 'Geral';
+
+// ─── NORMALIZERS ───
+function normStatus(s) {
+  if (!s) return 'Sem Status';
+  const t = String(s).trim().toLowerCase();
+  if (t.includes('produ')) return 'Produção';
+  if (t.includes('backlog')||t.includes('aberto')) return 'Aberto/Backlog';
+  if (t.includes('impedi')||t.includes('impedit')) return 'Impedimento';
+  if (t.includes('homolog')) return 'Homologação';
+  if (t.includes('encerra')||t.includes('conclu')) return 'Encerrado';
+  if (t.includes('desenv')) return 'Desenvolvimento';
+  if (t.includes('open')) return 'Open';
+  if (t.includes('valida')) return 'Validar';
+  return String(s).trim();
+}
+function normCat(c) {
+  if (!c) return null;
+  const t = String(c).trim().toLowerCase();
+  if (t.includes('melhoria')) return 'Melhoria';
+  if (t.includes('corre')) return 'Correção';
+  if (t.includes('erro')) return 'Erro';
+  if (t.includes('manut')) return 'Manutenção';
+  return String(c).trim();
+}
+function normPrio(p) {
+  if (!p) return null;
+  const t = String(p).trim().toLowerCase();
+  if (t.includes('urgente')) return 'Urgente';
+  if (t.includes('alta')) return 'Alta';
+  if (t.includes('m')&&t.includes('dia')) return 'Média';
+  if (t.includes('baixa')) return 'Baixa';
+  return String(p).trim();
+}
+
+// ─── INIT ───
+function init(raw) {
+  SHEETS = {};
+  for (const [k,rows] of Object.entries(raw)) SHEETS[k] = rows;
+}
+init(RAW);
+
+// ─── DATE ───
+(function(){
+  const d = new Date();
+  document.getElementById('topDate').textContent =
+    'Atualizado: ' + d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+})();
+
+// ─── FILE UPLOAD ───
+function loadFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, {type:'array',cellDates:true});
+      const nd = {};
+      wb.SheetNames.forEach(n => {
+        const ws = wb.Sheets[n];
+        nd[n] = XLSX.utils.sheet_to_json(ws,{defval:''}).map(r => {
+          const o = {};
+          for (const [k,v] of Object.entries(r))
+            o[k] = v instanceof Date ? v.toISOString().slice(0,10) : v;
+          return o;
+        });
+      });
+      init(nd);
+      current = 'Geral';
+      renderTabs();
+      renderDash();
+      toast('Planilha carregada com sucesso!', false);
+    } catch(err) {
+      toast('Erro: ' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── TOAST ───
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = err ? 'var(--red)' : 'var(--green)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ─── HELPERS ───
+function rows(sheet) {
+  if (sheet === 'Geral') {
+    let all = [];
+    for (const [k,rs] of Object.entries(SHEETS)) rs.forEach(r => all.push({...r,_s:k}));
+    return all;
+  }
+  return (SHEETS[sheet]||[]).map(r=>{return{...r,_s:sheet}});
+}
+function isFala(r) { return r._s === 'FALA-SP' || 'Titulo ' in r || 'Titulo' in r }
+function gs(r) { return normStatus(r.Status||r.status||'') }
+function gc(r) { return normCat(r.Categoria||'') }
+function gp(r) { return normPrio(r.Prioridade||'') }
+
+function countMap(arr) {
+  const m = {};
+  arr.forEach(x => { if(x) m[x]=(m[x]||0)+1 });
+  return m;
+}
+
+function getImp(rs) {
+  return rs.filter(r => {
+    const imp = r['Data de Impedimento'];
+    return (imp && imp !== '' && imp !== 'NaT') || gs(r) === 'Impedimento';
+  });
+}
+
+function getConcl(rs) {
+  return rs.filter(r => {
+    const s = gs(r).toLowerCase();
+    return s.includes('produ') || s.includes('encerra') || s.includes('conclu');
+  });
+}
+
+function getTimeline(rs) {
+  const m = {};
+  rs.filter(r=>!isFala(r)).forEach(r => {
+    const pp = r['Previsão Produção'];
+    if (!pp||pp==='') return;
+    const d = String(pp).slice(0,7);
+    if (/^\d{4}-\d{2}$/.test(d)) m[d]=(m[d]||0)+1;
+  });
+  return m;
+}
+
+// ─── BADGE CLASS ───
+function bc(status) {
+  const s = status.toLowerCase();
+  if (s.includes('produ')) return 'b-prod';
+  if (s.includes('backlog')||s.includes('aberto')) return 'b-back';
+  if (s.includes('impedi')||s.includes('impedit')) return 'b-imp';
+  if (s.includes('homolog')) return 'b-hom';
+  if (s.includes('encerra')||s.includes('conclu')) return 'b-enc';
+  if (s.includes('desenv')) return 'b-dev';
+  if (s.includes('open')) return 'b-open';
+  return 'b-back';
+}
+
+// ─── CHARTS ───
+let charts = {};
+function killCharts() {
+  for (const c of Object.values(charts)) try{c.destroy()}catch(e){}
+  charts = {};
+}
+
+const COLORS = ['#1847c4','#146c3a','#a05c0a','#b01818','#5b2ca0','#0a6a62','#6b3a12','#2a5c8a'];
+const COLORS_LIGHT = ['rgba(24,71,196,.15)','rgba(20,108,58,.15)','rgba(160,92,10,.15)','rgba(176,24,24,.15)','rgba(91,44,160,.15)','rgba(10,106,98,.15)'];
+
+// ─── TABS ───
+function renderTabs() {
+  const tabs = ['Geral', ...Object.keys(SHEETS)];
+  document.getElementById('tabs').innerHTML = tabs.map(t =>
+    `<div class="tab ${t===current?'on':''}" onclick="selectTab('${t}')">${t}</div>`
+  ).join('');
+}
+
+function selectTab(name) {
+  current = name;
+  renderTabs();
+  renderDash();
+}
+
+// ─── DASHBOARD ───
+function renderDash() {
+  killCharts();
+  const rs = rows(current);
+  const structured = rs.filter(r => !isFala(r));
+  const all = rs;
+  const isFalaTab = current === 'FALA-SP';
+
+  const total = all.length;
+  const imp = getImp(all);
+  const concl = getConcl(all);
+  const pct = total ? Math.round(concl.length/total*100) : 0;
+  const statusMap = countMap(all.map(r => gs(r)));
+  const catMap = countMap(structured.map(r => gc(r)).filter(Boolean));
+  const prioMap = countMap(structured.map(r => gp(r)).filter(Boolean));
+  const prioHigh = (prioMap['Urgente']||0)+(prioMap['Alta']||0);
+  const timeline = getTimeline(all);
+
+  const tableRS = isFalaTab ? all : structured;
+
+  let html = '';
+
+  // FALA notice
+  if (isFalaTab) {
+    html += `<div class="fala-notice">ℹ️ A aba <strong>FALA-SP</strong> possui estrutura simplificada (Título, Card, Status). Os gráficos de categoria, prioridade e timeline utilizam dados das demais abas.</div>`;
+  }
+
+  // KPIs
+  html += `<div class="slabel">Visão Geral</div>
+  <div class="kpis">
+    <div class="kpi k-blue"><div class="kpi-label">Total de Demandas</div><div class="kpi-value">${total}</div><div class="kpi-sub">todas as solicitações</div></div>
+    <div class="kpi k-green"><div class="kpi-label">Em Produção / Concluído</div><div class="kpi-value">${concl.length}</div><div class="kpi-sub">${pct}% do total</div></div>
+    <div class="kpi k-red"><div class="kpi-label">Com Impedimento</div><div class="kpi-value">${imp.length}</div><div class="kpi-sub">itens bloqueados</div></div>
+    <div class="kpi k-amber"><div class="kpi-label">Alta Prioridade</div><div class="kpi-value">${prioHigh}</div><div class="kpi-sub">Urgente + Alta</div></div>
+    <div class="kpi k-purple"><div class="kpi-label">Tipos de Status</div><div class="kpi-value">${Object.keys(statusMap).length}</div><div class="kpi-sub">status distintos</div></div>
+  </div>`;
+
+  // Progress
+  html += `<div class="prog-card">
+    <div class="prog-head">
+      <div class="prog-title">Progresso do Projeto — Demandas Concluídas</div>
+      <div class="prog-pct">${pct}%</div>
+    </div>
+    <div class="prog-track"><div class="prog-fill" id="pfill" style="width:0%"></div></div>
+    <div class="prog-legend">
+      <span><span class="prog-dot" style="background:var(--green)"></span>Produção/Concluído: ${concl.length}</span>
+      <span><span class="prog-dot" style="background:var(--border2)"></span>Em andamento: ${total-concl.length}</span>
+      <span><span class="prog-dot" style="background:var(--red)"></span>Impedimentos: ${imp.length}</span>
+    </div>
+  </div>`;
+
+  // Status chips
+  html += `<div class="slabel">Distribuição por Status</div><div class="status-chips">`;
+  for (const [s,c] of Object.entries(statusMap).sort((a,b)=>b[1]-a[1])) {
+    html += `<div class="s-chip"><span class="s-chip-n">${c}</span><span class="s-chip-l">${s}</span></div>`;
+  }
+  html += `</div>`;
+
+  // Charts row 1
+  html += `<div class="slabel">Análises</div><div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Status — Distribuição</div>
+      <div class="chart-wrap" style="height:230px"><canvas id="cStatus" role="img" aria-label="Rosca de status"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Mix de Categorias</div>
+      <div class="chart-wrap" style="height:230px"><canvas id="cCat" role="img" aria-label="Pizza de categorias"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Priorização Global</div>
+      <div class="chart-wrap" style="height:230px"><canvas id="cPrio" role="img" aria-label="Barras de prioridade"></canvas></div>
+    </div>
+  </div>`;
+
+  // Timeline
+  html += `<div class="slabel">Timeline de Entregas</div>
+  <div class="timeline-card">
+    <div class="chart-title">Previsão de Produção por Mês (volume de itens)</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="cTimeline" role="img" aria-label="Timeline de entregas"></canvas></div>
+  </div>`;
+
+  // Impedimentos
+  if (imp.length > 0) {
+    html += `<div class="imp-block"><div class="imp-title">⚠ Itens com Impedimento (${imp.length})</div>`;
+    imp.slice(0,12).forEach(r => {
+      const desc = r['Descrição']||r['Titulo ']||r['Titulo']||'Sem descrição';
+      const obs = r['Observação']||'';
+      html += `<div class="imp-item"><strong>${String(r._s||'').slice(0,12)}</strong> · ${String(desc).slice(0,80)}${obs?' — '+String(obs).slice(0,60):''}</div>`;
+    });
+    if (imp.length>12) html += `<div class="imp-item" style="opacity:.6">... e mais ${imp.length-12} itens</div>`;
+    html += `</div>`;
+  }
+
+  // Table
+  html += `<div class="slabel">Lista Detalhada de Entregas</div>
+  <div class="table-card">
+    <div class="table-head">
+      <span class="table-head-title">${tableRS.length} registros</span>
+      <div class="table-controls">
+        <input class="search-box" type="search" placeholder="Buscar na tabela..." oninput="filterTable(this.value)" id="srch">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          ${current==='Geral'?'<th>Sistema</th>':''}
+          <th>Código</th><th style="min-width:220px">Descrição</th>
+          <th>Categoria</th><th>Status</th><th>Prioridade</th><th>Previsão Produção</th>
+        </tr></thead>
+        <tbody id="tbody">`;
+
+  tableRS.forEach(r => {
+    const cod = r['Código']||r['Card']||'—';
+    const desc = r['Descrição']||r['Titulo ']||r['Titulo']||'';
+    const cat = gc(r)||'';
+    const status = gs(r);
+    const prio = gp(r)||'';
+    const prev = String(r['Previsão Produção']||'').slice(0,10);
+    html += `<tr>
+      ${current==='Geral'?`<td class="mono" style="font-size:10px">${r._s}</td>`:''}
+      <td class="mono">${String(cod).slice(0,20)}</td>
+      <td style="max-width:280px;font-size:12px">${String(desc).slice(0,90)}${desc.length>90?'…':''}</td>
+      <td>${cat?`<span class="badge b-back">${cat}</span>`:''}</td>
+      <td><span class="badge ${bc(status)}">${status}</span></td>
+      <td style="font-size:11px;color:var(--ink2)">${prio}</td>
+      <td class="mono" style="font-size:11px">${prev}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div></div>`;
+
+  document.getElementById('main').innerHTML = html;
+
+  // Animate progress bar
+  setTimeout(() => {
+    const pf = document.getElementById('pfill');
+    if (pf) pf.style.width = pct + '%';
+  }, 100);
+
+  // Draw charts
+  const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)';
+  const tickColor = isDark ? 'rgba(255,255,255,.4)' : 'rgba(0,0,0,.4)';
+
+  setTimeout(() => {
+    // Status donut
+    const sLabels = Object.keys(statusMap);
+    const sVals = Object.values(statusMap);
+    charts.s = new Chart(document.getElementById('cStatus'), {
+      type:'doughnut',
+      data:{labels:sLabels,datasets:[{data:sVals,backgroundColor:COLORS.slice(0,sLabels.length),borderWidth:2,borderColor:isDark?'#1c1c14':'#fff'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:8,color:isDark?'#a8a69e':'#5c5a52'}}}}
+    });
+
+    // Category pie
+    const cLabels = Object.keys(catMap);
+    const cVals = Object.values(catMap);
+    charts.c = new Chart(document.getElementById('cCat'), {
+      type:'pie',
+      data:{labels:cLabels.length?cLabels:['Sem cat'],datasets:[{data:cVals.length?cVals:[1],backgroundColor:COLORS.slice(0,Math.max(cLabels.length,1)),borderWidth:2,borderColor:isDark?'#1c1c14':'#fff'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:8,color:isDark?'#a8a69e':'#5c5a52'}}}}
+    });
+
+    // Priority bars
+    const pOrder = ['Urgente','Alta','Média','Baixa'];
+    const pLabels = pOrder.filter(p=>prioMap[p]);
+    const pVals = pLabels.map(p=>prioMap[p]||0);
+    const pColors = ['#b01818','#a05c0a','#1847c4','#146c3a'];
+    charts.p = new Chart(document.getElementById('cPrio'), {
+      type:'bar',
+      data:{labels:pLabels.length?pLabels:['—'],datasets:[{label:'Demandas',data:pVals.length?pVals:[0],backgroundColor:pColors.slice(0,pLabels.length||1),borderRadius:5,borderSkipped:false}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,color:tickColor},grid:{color:gridColor}},x:{ticks:{color:tickColor},grid:{display:false}}}}
+    });
+
+    // Timeline
+    const tlK = Object.keys(timeline).sort();
+    const tlV = tlK.map(k=>timeline[k]);
+    charts.t = new Chart(document.getElementById('cTimeline'), {
+      type:'bar',
+      data:{labels:tlK.length?tlK:['Sem dados'],datasets:[{label:'Itens',data:tlV.length?tlV:[0],backgroundColor:'#1847c4',borderRadius:4,borderSkipped:false}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{autoSkip:false,maxRotation:45,font:{size:9},color:tickColor},grid:{display:false}},y:{beginAtZero:true,ticks:{stepSize:1,color:tickColor},grid:{color:gridColor}}}}
+    });
+  }, 60);
+}
+
+window.filterTable = function(term) {
+  const t = term.toLowerCase();
+  document.querySelectorAll('#tbody tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(t) ? '' : 'none';
+  });
+};
+
+// ─── START ───
+renderTabs();
+renderDash();
+</script>
+</body>
+</html>
